@@ -1,7 +1,7 @@
 import cupy as cp
 from typing import Dict, Any
 from .layer import Layer
-from .layer_commons import weights_from_he
+from .layer_commons import weights_from_he, softmax
 
 class SoftmaxLayer(Layer):
     """
@@ -40,20 +40,6 @@ class SoftmaxLayer(Layer):
         
         return SoftmaxLayer(weights=weights, biases=biases)
     
-    def softmax(self, input: cp.ndarray) -> cp.ndarray:
-        """
-        Apply Softmax activation function with numerical stability.
-        
-        Args:
-            input: Input array of shape (batch_size, num_classes)
-            
-        Returns:
-            Softmax output probabilities in range (0, 1) summing to 1 per sample
-        """
-        input_shifted: cp.ndarray = input - cp.max(input, axis=1, keepdims=True)
-        exp_input: cp.ndarray = cp.exp(input_shifted)
-        return exp_input / cp.sum(exp_input, axis=1, keepdims=True)
-    
     def forward(self, input: cp.ndarray) -> cp.ndarray:
         """
         Forward pass: linear transformation followed by Softmax activation.
@@ -65,4 +51,4 @@ class SoftmaxLayer(Layer):
             Softmax output probabilities of shape (batch_size, num_neurons)
         """
         linear_output = super().forward(input=input)
-        return self.softmax(input=linear_output)
+        return softmax(input=linear_output)

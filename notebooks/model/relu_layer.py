@@ -39,18 +39,6 @@ class ReluLayer(Layer):
         biases: cp.ndarray = cp.zeros(shape=(num_neurons,))
         
         return ReluLayer(weights=weights, biases=biases)
-
-    def relu(self, input: cp.ndarray) -> cp.ndarray:
-        """
-        Apply ReLU activation function.
-        
-        Args:
-            input: Input array
-            
-        Returns:
-            Activated output with negative values set to 0
-        """
-        return cp.maximum(0, input)
     
     def forward(self, input: cp.ndarray) -> cp.ndarray:
         """
@@ -64,7 +52,7 @@ class ReluLayer(Layer):
         """
         linear_output = super().forward(input=input)
         self.last_linear_output = linear_output
-        return self.relu(input=linear_output)
+        return cp.maximum(0, linear_output)
     
     def backward(self, output_error: cp.ndarray, batch_size: int) -> cp.ndarray:
         """

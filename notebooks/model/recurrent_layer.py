@@ -47,18 +47,6 @@ class RecurrentLayer(Layer):
         
         return RecurrentLayer(weights=weights, state_weights=state_weights, biases=biases)
 
-    def tanh(self, input: cp.ndarray) -> cp.ndarray:
-        """
-        Apply Tanh activation function.
-        
-        Args:
-            input: Input array
-            
-        Returns:
-            Activated output with values in range (-1, 1)
-        """
-        return cp.tanh(input)
-
     def reset_state(self, batch_size: Optional[int] = None, dtype: cp.dtype = cp.float32) -> None:
         """
         Reset the recurrent hidden state.
@@ -74,29 +62,26 @@ class RecurrentLayer(Layer):
 
         self.state = cp.zeros((batch_size, self.biases.shape[0]), dtype=dtype)
     
-    def forward(self, input: cp.ndarray, prev_state: Optional[cp.ndarray] = None) -> cp.ndarray:
+    def forward(self, input: cp.ndarray) -> cp.ndarray:
         """
         Forward pass: linear transformation followed by Tanh activation.
         
         Args:
             input: Input array of shape (batch_size, input_size)
-            prev_state: Previous hidden state of shape (batch_size, num_neurons)
             
         Returns:
             Activated output array of shape (batch_size, num_neurons)
         """
-        if prev_state is not None:
-            self.state = prev_state
-
         if self.state is None or self.state.shape[0] != input.shape[0]:
             self.state = cp.zeros((input.shape[0], self.biases.shape[0]), dtype=input.dtype)
 
+        prev_state = self.state
         linear_output = super().forward(input=input)
-        linear_output += self.state @ self.state_weights
+        linear_output += prev_state @ self.state_weights
 
-        self.last_prev_state = self.state
+        self.last_prev_state = prev_state
         self.last_linear_output = linear_output
-        output_state = self.tanh(input=linear_output)
+        output_state = cp.tanh(input=linear_output)
         self.state = output_state
         return output_state
 
@@ -135,7 +120,7 @@ class RecurrentLayer(Layer):
         Returns:
             Error gradient to propagate to previous layer
         """
-        tanh_output = self.tanh(input=self.last_linear_output)
+        tanh_output = cp.tanh(input=self.last_linear_output)
         tanh_grad = output_error * (1 - tanh_output ** 2)
 
         if self.last_prev_state is not None:
