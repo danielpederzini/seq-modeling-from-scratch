@@ -1,0 +1,155 @@
+import copy
+import cupy as cp
+from .layer import Layer
+from .relu_layer import ReluLayer
+from .softmax_layer import SoftmaxLayer
+
+class Network:
+    """
+    Neural network composed of multiple layers.
+
+    Orchestrates forward passes, backward passes, and parameter updates for
+    networks built from dense layers.
+    """
+    
+    LAYER_TYPES: dict[str, type] = {
+        "ReLU": ReluLayer,
+        "Softmax": SoftmaxLayer,
+    }
+    
+    def __init__(self, layer_definitions: list[dict]) -> None:
+        """
+        Initialize network with layer definitions.
+        
+        Args:
+            layer_definitions: List of dictionaries defining each layer.
+                For fully connected layers: 'type' (layer type), 'input_size', and 'num_neurons'.
+        """
+        self.layers = self.initialize_layers(layer_definitions=layer_definitions)
+    
+    def initialize_layers(self, layer_definitions: list[dict]) -> list[Layer]:
+        """
+        Create layer instances based on definitions.
+        
+        Each layer type is responsible for creating itself from its definition.
+        
+        Args:
+            layer_definitions: List of layer configuration dictionaries
+            
+        Returns:
+            List of initialized Layer objects
+        """
+        layers: list[Layer] = []
+        
+        for definition in layer_definitions:
+            layer_type: str = definition.get("type", "Layer")
+            layer_class: type = self.LAYER_TYPES.get(layer_type, Layer)
+            layers.append(layer_class.from_definition(definition))
+        
+        return layers
+
+    def clone(self) -> "Network":
+        """
+        Create a full copy of the network state.
+
+        Returns:
+            Deep-copied network instance with independent parameters
+        """
+        return copy.deepcopy(self)
+    
+    def describe(self) -> None:
+        """
+        Print a formatted description of the network architecture.
+        
+        Delegates description to each layer.
+        """
+        description_lines: list[str] = [
+            "=" * 80,
+            "Network Architecture",
+            "=" * 80,
+        ]
+        
+        total_params: int = 0
+        
+        for layer_idx, layer in enumerate(self.layers, start=1):
+            layer_desc: str = layer.describe()
+            layer_params: int = layer.parameter_count()
+            
+            total_params += layer_params
+            
+            description_lines.append(f"\nLayer {layer_idx}: {layer_desc}")
+        
+        description_lines.append("\n" + "=" * 80)
+        description_lines.append(f"Total Parameters: {total_params:,}")
+        description_lines.append("=" * 80)
+        
+        print("\n".join(description_lines))
+
+    def forward(self, input: cp.ndarray, print_shapes: bool = False) -> list[cp.ndarray]:
+        """
+        Forward pass through all layers.
+        
+        Args:
+            input: Input tensor expected by the first layer in the network
+            print_shapes: Whether to print the shape of the output at each layer
+            
+        Returns:
+            List of output arrays from each layer
+        """
+        outputs: list[cp.ndarray] = []
+        
+        for layer in self.layers:
+            output = layer.forward(input=input)
+            outputs.append(output)
+            if print_shapes:
+                print(f"Layer {self.layers.index(layer)} Output Shape: {output.shape}")
+            input = output
+            
+        return outputs
+
+    def backward(self, output_error: cp.ndarray, batch_size: int) -> list[cp.ndarray]:
+        """
+        Backward pass through all layers (reverse order).
+        
+        Computes gradients and accumulates error for parameter updates.
+        
+        Args:
+            output_error: Error gradient from loss function
+            batch_size: Size of the batch
+        
+        Returns:
+            List of error gradients for each layer
+        """
+        gradients: list[cp.ndarray] = [output_error]
+        
+        for layer in reversed(self.layers):
+            gradient = layer.backward(output_error=gradients[-1], batch_size=batch_size)
+            gradients.append(gradient)
+
+        return gradients
+
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
+        """
+        Update all layer parameters using computed gradients.
+        
+        Args:
+            learning_rate: Learning rate for gradient descent update
+            weight_decay_lambda: Regularization parameter for weight decay
+        """
+        for layer in self.layers:
+            layer.update_parameters(learning_rate=learning_rate, weight_decay_lambda=weight_decay_lambda)
+
+    def cce_loss(self, y_pred: cp.ndarray, y_true: cp.ndarray, epsilon=1e-15) -> cp.ndarray:
+        """
+        Compute categorical cross-entropy loss.
+
+        Args:
+            y_pred: Predicted class probabilities of shape (batch_size, num_classes)
+            y_true: One-hot encoded target labels of shape (batch_size, num_classes)
+            epsilon: Small value used to avoid taking the log of zero
+
+        Returns:
+            Scalar mean categorical cross-entropy loss
+        """
+        y_pred = cp.clip(y_pred, epsilon, 1. - epsilon)
+        return -cp.mean(cp.sum(y_true * cp.log(y_pred), axis=1))
