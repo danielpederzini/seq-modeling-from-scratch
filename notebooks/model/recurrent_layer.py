@@ -1,5 +1,6 @@
 import cupy as cp
 from typing import Optional, Dict, Any
+from .layer_commons import weights_from_xavier
 from .layer import Layer
 
 class RecurrentLayer(Layer):
@@ -40,16 +41,8 @@ class RecurrentLayer(Layer):
         input_size: int = definition.get("input_size")
         num_neurons: int = definition.get("num_neurons")
         
-        weights: cp.ndarray = cp.random.normal(
-            0,
-            cp.sqrt(2.0 / input_size),
-            size=(input_size, num_neurons)
-        )
-        state_weights: cp.ndarray = cp.random.normal(
-            0,
-            cp.sqrt(2.0 / num_neurons),
-            size=(num_neurons, num_neurons)
-        )
+        weights: cp.ndarray = weights_from_xavier(input_size=input_size, num_neurons=num_neurons)
+        state_weights: cp.ndarray = weights_from_xavier(input_size=num_neurons, num_neurons=num_neurons)
         biases: cp.ndarray = cp.zeros(shape=(num_neurons,))
         
         return RecurrentLayer(weights=weights, state_weights=state_weights, biases=biases)

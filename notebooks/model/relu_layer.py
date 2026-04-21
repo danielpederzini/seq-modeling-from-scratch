@@ -1,6 +1,7 @@
 import cupy as cp
 from typing import Optional, Dict, Any
 from .layer import Layer
+from .layer_commons import weights_from_he
 
 class ReluLayer(Layer):
     """
@@ -34,11 +35,7 @@ class ReluLayer(Layer):
         input_size: int = definition.get("input_size")
         num_neurons: int = definition.get("num_neurons")
         
-        weights: cp.ndarray = cp.random.normal(
-            0,
-            cp.sqrt(2.0 / input_size),
-            size=(input_size, num_neurons)
-        )
+        weights: cp.ndarray = weights_from_he(input_size=input_size, num_neurons=num_neurons)
         biases: cp.ndarray = cp.zeros(shape=(num_neurons,))
         
         return ReluLayer(weights=weights, biases=biases)
