@@ -1,6 +1,7 @@
 import copy
 import cupy as cp
 from .layer import Layer
+from .recurrent_layer import RecurrentLayer
 from .relu_layer import ReluLayer
 from .softmax_layer import SoftmaxLayer
 
@@ -9,10 +10,11 @@ class Network:
     Neural network composed of multiple layers.
 
     Orchestrates forward passes, backward passes, and parameter updates for
-    networks built from dense layers.
+    networks built from dense and recurrent layers.
     """
     
     LAYER_TYPES: dict[str, type] = {
+        "Recurrent": RecurrentLayer,
         "ReLU": ReluLayer,
         "Softmax": SoftmaxLayer,
     }
@@ -87,25 +89,42 @@ class Network:
 
     def forward(self, input: cp.ndarray, print_shapes: bool = False) -> list[cp.ndarray]:
         """
-        Forward pass through all layers.
-        
+        Forward pass for a single timestep through all layers.
+
+        Recurrent layers use their internal state, which can be reset via
+        ``reset_states`` between independent sequences.
+
         Args:
-            input: Input tensor expected by the first layer in the network
+            input: Input tensor for the current timestep
             print_shapes: Whether to print the shape of the output at each layer
-            
+
         Returns:
             List of output arrays from each layer
         """
         outputs: list[cp.ndarray] = []
-        
-        for layer in self.layers:
-            output = layer.forward(input=input)
+        current_input: cp.ndarray = input
+
+        for layer_index, layer in enumerate(self.layers):
+            output = layer.forward(input=current_input)
             outputs.append(output)
             if print_shapes:
-                print(f"Layer {self.layers.index(layer)} Output Shape: {output.shape}")
-            input = output
-            
+                print(f"Layer {layer_index} Output Shape: {output.shape}")
+            current_input = output
+
         return outputs
+
+    def reset_states(self, batch_size: int | None = None, dtype: cp.dtype = cp.float32) -> None:
+        """
+        Reset recurrent states for all recurrent layers in the network.
+
+        Args:
+            batch_size: If provided, initialize zero states for this batch size.
+                If None, clear states and lazily initialize on next forward.
+            dtype: Data type used when initializing states.
+        """
+        for layer in self.layers:
+            if isinstance(layer, RecurrentLayer):
+                layer.reset_state(batch_size=batch_size, dtype=dtype)
 
     def backward(self, output_error: cp.ndarray, batch_size: int) -> list[cp.ndarray]:
         """
