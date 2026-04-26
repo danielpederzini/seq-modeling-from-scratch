@@ -1,8 +1,8 @@
 import copy
 import cupy as cp
-from .layer import Layer
+from .layer import BaseLayer, Layer
+from .embedding_layer import EmbeddingLayer
 from .recurrent_layer import RecurrentLayer
-from .relu_layer import ReluLayer
 from .softmax_layer import SoftmaxLayer
 
 class Network:
@@ -14,9 +14,9 @@ class Network:
     """
     
     LAYER_TYPES: dict[str, type] = {
+        "Embedding": EmbeddingLayer,
         "Recurrent": RecurrentLayer,
-        "ReLU": ReluLayer,
-        "Softmax": SoftmaxLayer,
+        "Softmax": SoftmaxLayer
     }
     
     def __init__(self, layer_definitions: list[dict]) -> None:
@@ -29,7 +29,7 @@ class Network:
         """
         self.layers = self.initialize_layers(layer_definitions=layer_definitions)
     
-    def initialize_layers(self, layer_definitions: list[dict]) -> list[Layer]:
+    def initialize_layers(self, layer_definitions: list[dict]) -> list[BaseLayer]:
         """
         Create layer instances based on definitions.
         
@@ -39,9 +39,9 @@ class Network:
             layer_definitions: List of layer configuration dictionaries
             
         Returns:
-            List of initialized Layer objects
+            List of initialized BaseLayer objects
         """
-        layers: list[Layer] = []
+        layers: list[BaseLayer] = []
         
         for definition in layer_definitions:
             layer_type: str = definition.get("type", "Layer")
@@ -115,37 +115,34 @@ class Network:
 
     def reset_states(self, batch_size: int | None = None, dtype: cp.dtype = cp.float32) -> None:
         """
-        Reset recurrent states for all recurrent layers in the network.
+        Reset recurrent states and sequence histories for all layers.
 
         Args:
-            batch_size: If provided, initialize zero states for this batch size.
+            batch_size: If provided, initialize zero states for recurrent layers.
                 If None, clear states and lazily initialize on next forward.
-            dtype: Data type used when initializing states.
+            dtype: Data type used when initializing recurrent states.
         """
         for layer in self.layers:
             if isinstance(layer, RecurrentLayer):
                 layer.reset_state(batch_size=batch_size, dtype=dtype)
+            else:
+                layer.reset()
 
-    def backward(self, output_error: cp.ndarray, batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> None:
         """
-        Backward pass through all layers (reverse order).
-        
-        Computes gradients and accumulates error for parameter updates.
-        
+        Backward pass over a full sequence chunk (BPTT).
+
+        Each layer computes and accumulates its own gradients across all timesteps.
+        Call update_parameters afterwards to apply the accumulated gradients.
+
         Args:
-            output_error: Error gradient from loss function
-            batch_size: Size of the batch
-        
-        Returns:
-            List of error gradients for each layer
+            output_errors: Per-timestep error gradients from the loss, one array
+                per timestep in chronological order
+            batch_size: Batch size used for gradient averaging
         """
-        gradients: list[cp.ndarray] = [output_error]
-        
+        current_errors = output_errors
         for layer in reversed(self.layers):
-            gradient = layer.backward(output_error=gradients[-1], batch_size=batch_size)
-            gradients.append(gradient)
-
-        return gradients
+            current_errors = layer.backward_sequence(current_errors, batch_size)
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
         """
