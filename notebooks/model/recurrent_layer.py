@@ -135,7 +135,7 @@ class RecurrentLayer(Layer):
         Returns:
             Per-timestep error gradients w.r.t. the input, for the previous layer
         """
-        time_steps = len(output_errors)
+        timesteps = len(output_errors)
         accumulated_w_grad = cp.zeros_like(self.weights)
         accumulated_s_grad = cp.zeros_like(self.state_weights)
         accumulated_b_grad = cp.zeros_like(self.biases)
@@ -161,9 +161,9 @@ class RecurrentLayer(Layer):
             per_step_input_errors.append(input_error)
             accumulated_state_error = tanh_grad @ self.state_weights.T
 
-        self.w_grad = self.clip_grad(grad=accumulated_w_grad / time_steps)
-        self.s_grad = self.clip_grad(grad=accumulated_s_grad / time_steps)
-        self.b_grad = accumulated_b_grad / time_steps
+        self.w_grad = self.clip_grad(grad=accumulated_w_grad / timesteps)
+        self.s_grad = self.clip_grad(grad=accumulated_s_grad / timesteps)
+        self.b_grad = accumulated_b_grad / timesteps
         self.input_errors = list(reversed(per_step_input_errors))
 
         return self.input_errors
