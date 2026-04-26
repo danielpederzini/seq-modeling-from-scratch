@@ -4,6 +4,7 @@ from .layer import BaseLayer, Layer
 from .embedding_layer import EmbeddingLayer
 from .recurrent_layer import RecurrentLayer
 from .gated_recurrent_layer import GatedRecurrentLayer
+from .lstm_layer import LSTMLayer
 from .softmax_layer import SoftmaxLayer
 
 class Network:
@@ -18,6 +19,7 @@ class Network:
         "Embedding": EmbeddingLayer,
         "Recurrent": RecurrentLayer,
         "GatedRecurrent": GatedRecurrentLayer,
+        "LSTM": LSTMLayer,
         "Softmax": SoftmaxLayer
     }
     
@@ -125,7 +127,7 @@ class Network:
             dtype: Data type used when initializing recurrent states.
         """
         for layer in self.layers:
-            if isinstance(layer, (RecurrentLayer, GatedRecurrentLayer)):
+            if isinstance(layer, (RecurrentLayer, GatedRecurrentLayer, LSTMLayer)):
                 layer.reset_state(batch_size=batch_size, dtype=dtype)
             else:
                 layer.reset()
