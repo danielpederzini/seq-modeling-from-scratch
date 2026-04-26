@@ -20,6 +20,7 @@ class SoftmaxLayer(Layer):
             biases: Bias vector of shape (num_neurons,)
         """
         super().__init__(weights=weights, biases=biases)
+        self.input_history: list[cp.ndarray] = []
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "SoftmaxLayer":
@@ -51,4 +52,16 @@ class SoftmaxLayer(Layer):
             Softmax output probabilities of shape (batch_size, num_neurons)
         """
         linear_output = super().forward(input=input)
+        self.input_history.append(self.last_input)
         return softmax(input=linear_output)
+
+    def reset(self) -> None:
+        self.input_history = []
+
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+        T = len(output_errors)
+        self.w_grad = self.clip_grad(
+            sum(inp.T @ e for inp, e in zip(self.input_history, output_errors)) / (batch_size * T)
+        )
+        self.b_grad = sum(cp.mean(e, axis=0) for e in output_errors) / T
+        return [e @ self.weights.T for e in output_errors]

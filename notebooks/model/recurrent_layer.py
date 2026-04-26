@@ -22,9 +22,11 @@ class RecurrentLayer(Layer):
         super().__init__(weights=weights, biases=biases)
         self.state_weights = state_weights
         self.state: Optional[cp.ndarray] = None
-        self.last_prev_state: Optional[cp.ndarray] = None
         self.s_grad: Optional[cp.ndarray] = None
-        self.state_error: Optional[cp.ndarray] = None
+        self.input_errors: list[cp.ndarray] = []
+        self.input_history: list[cp.ndarray] = []
+        self.prev_state_history: list[cp.ndarray] = []
+        self.state_history: list[cp.ndarray] = []
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "RecurrentLayer":
@@ -57,10 +59,17 @@ class RecurrentLayer(Layer):
         """
         if batch_size is None:
             self.state = None
-            return
+        else:
+            self.state = cp.zeros((batch_size, self.biases.shape[0]), dtype=dtype)
 
-        self.state = cp.zeros((batch_size, self.biases.shape[0]), dtype=dtype)
-    
+        self.input_history = []
+        self.prev_state_history = []
+        self.state_history = []        
+        self.input_errors = []
+
+    def reset(self) -> None:
+        self.reset_state()
+
     def forward(self, input: cp.ndarray) -> cp.ndarray:
         """
         Forward pass: linear transformation followed by Tanh activation.
@@ -78,9 +87,13 @@ class RecurrentLayer(Layer):
         linear_output = super().forward(input=input)
         linear_output += prev_state @ self.state_weights
 
-        self.last_prev_state = prev_state
         output_state = cp.tanh(linear_output)
         self.state = output_state
+
+        self.input_history.append(self.last_input)
+        self.prev_state_history.append(prev_state)
+        self.state_history.append(output_state)
+
         return output_state
 
     def describe(self) -> str:
@@ -107,29 +120,52 @@ class RecurrentLayer(Layer):
         """
         return super().parameter_count() + int(self.state_weights.shape[0] * self.state_weights.shape[1])
     
-    def backward(self, output_error: cp.ndarray, batch_size: int) -> cp.ndarray:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
         """
-        Backward pass: Tanh gradient followed by linear layer gradient.
+        Backward pass: unrolls through the full BPTT history, accumulating
+        gradients for weights, state weights, and biases across all timesteps.
+        Each timestep's direct error is injected at the correct point in the unroll.
         
         Args:
-            output_error: Error gradient from the next layer
+            output_errors: List of error gradients from the next layer, one per
+                timestep in chronological order (already projected through next layer's weights)
             batch_size: Size of the batch for gradient averaging
             
         Returns:
-            Error gradient to propagate to previous layer
+            Per-timestep error gradients w.r.t. the input, for the previous layer
         """
-        tanh_grad = output_error * (1 - self.state ** 2)
+        T = len(output_errors)
+        accumulated_w_grad = cp.zeros_like(self.weights)
+        accumulated_s_grad = cp.zeros_like(self.state_weights)
+        accumulated_b_grad = cp.zeros_like(self.biases)
 
-        if self.last_prev_state is not None:
-            state_grad = self.last_prev_state.T @ tanh_grad / batch_size
-            self.s_grad = self.clip_grad(grad=state_grad)
-            self.state_error = tanh_grad @ self.state_weights.T
-        else:
-            self.s_grad = None
-            self.state_error = None
+        dh = cp.zeros_like(self.state_history[0])
+        input_error = cp.zeros_like(self.input_history[0])
+        per_step_input_errors = []
 
-        input_error = super().backward(output_error=tanh_grad, batch_size=batch_size)
-        return input_error
+        for inp, prev_state, state, direct_error in zip(
+            reversed(self.input_history),
+            reversed(self.prev_state_history),
+            reversed(self.state_history),
+            reversed(output_errors),
+        ):
+            dh = direct_error + dh
+            tanh_grad = dh * (1 - state ** 2)
+
+            accumulated_w_grad += inp.T @ tanh_grad / batch_size
+            accumulated_s_grad += prev_state.T @ tanh_grad / batch_size
+            accumulated_b_grad += cp.mean(tanh_grad, axis=0)
+
+            input_error = tanh_grad @ self.weights.T
+            per_step_input_errors.append(input_error)
+            dh = tanh_grad @ self.state_weights.T
+
+        self.w_grad = self.clip_grad(grad=accumulated_w_grad / T)
+        self.s_grad = self.clip_grad(grad=accumulated_s_grad / T)
+        self.b_grad = accumulated_b_grad / T
+        self.input_errors = list(reversed(per_step_input_errors))
+
+        return self.input_errors
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
         """
