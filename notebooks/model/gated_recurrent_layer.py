@@ -315,7 +315,7 @@ class GatedRecurrentLayer(BaseLayer):
                 continue
             param = getattr(self, param_name)
             if momentum > 0.0:
-                vel = getattr(self, vel_name) or cp.zeros_like(param)
+                vel = getattr(self, vel_name) if getattr(self, vel_name) is not None else cp.zeros_like(param)
                 vel = momentum * vel + grad + weight_decay_lambda * param
                 setattr(self, vel_name, vel)
                 setattr(self, param_name, param - learning_rate * vel)
@@ -328,7 +328,7 @@ class GatedRecurrentLayer(BaseLayer):
                 continue
             param = getattr(self, param_name)
             if momentum > 0.0:
-                vel = getattr(self, vel_name) or cp.zeros_like(param)
+                vel = getattr(self, vel_name) if getattr(self, vel_name) is not None else cp.zeros_like(param)
                 vel = momentum * vel + grad
                 setattr(self, vel_name, vel)
                 setattr(self, param_name, param - learning_rate * vel)
