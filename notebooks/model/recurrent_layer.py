@@ -23,6 +23,7 @@ class RecurrentLayer(Layer):
         self.state_weights = state_weights
         self.state: Optional[cp.ndarray] = None
         self.s_grad: Optional[cp.ndarray] = None
+        self.s_velocity: Optional[cp.ndarray] = None
         self.input_errors: list[cp.ndarray] = []
         self.input_history: list[cp.ndarray] = []
         self.prev_state_history: list[cp.ndarray] = []
@@ -167,20 +168,28 @@ class RecurrentLayer(Layer):
 
         return self.input_errors
 
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
         Update this layer's trainable parameters, including recurrent weights.
 
         Args:
             learning_rate: Learning rate for gradient descent update
             weight_decay_lambda: Regularization parameter for weight decay
+            momentum: Momentum coefficient passed through to all parameter updates
         """
         super().update_parameters(
             learning_rate=learning_rate,
             weight_decay_lambda=weight_decay_lambda,
+            momentum=momentum,
         )
 
         if self.s_grad is not None:
-            self.state_weights -= learning_rate * (
-                self.s_grad + weight_decay_lambda * self.state_weights
-            )
+            if momentum > 0.0:
+                if self.s_velocity is None:
+                    self.s_velocity = cp.zeros_like(self.state_weights)
+                self.s_velocity = momentum * self.s_velocity + self.s_grad + weight_decay_lambda * self.state_weights
+                self.state_weights -= learning_rate * self.s_velocity
+            else:
+                self.state_weights -= learning_rate * (
+                    self.s_grad + weight_decay_lambda * self.state_weights
+                )

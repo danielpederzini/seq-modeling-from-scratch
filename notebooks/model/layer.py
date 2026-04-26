@@ -21,7 +21,7 @@ class BaseLayer(ABC):
     def backward_sequence(self, output_errors: list, batch_size: int) -> list: ...
 
     @abstractmethod
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None: ...
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None: ...
 
     @abstractmethod
     def describe(self) -> str: ...
@@ -51,6 +51,8 @@ class Layer(BaseLayer):
         self.last_input: Optional[cp.ndarray] = None
         self.w_grad: Optional[cp.ndarray] = None
         self.b_grad: Optional[cp.ndarray] = None
+        self.w_velocity: Optional[cp.ndarray] = None
+        self.b_velocity: Optional[cp.ndarray] = None
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "Layer":
@@ -169,15 +171,36 @@ class Layer(BaseLayer):
         """
         return [self.backward(e, batch_size) for e in output_errors]
 
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
         Update this layer's trainable parameters using the stored gradients.
+
+        When ``momentum > 0``, velocity vectors are maintained and the update
+        follows the heavy-ball SGD rule::
+
+            v = momentum * v + grad + weight_decay * param
+            param -= learning_rate * v
+
+        When ``momentum == 0`` the update reduces to plain SGD with weight decay.
 
         Args:
             learning_rate: Learning rate for gradient descent update
             weight_decay_lambda: Regularization parameter for weight decay
+            momentum: Momentum coefficient (0 disables momentum)
         """
         if self.w_grad is not None:
-            self.weights -= learning_rate * (self.w_grad + weight_decay_lambda * self.weights)
+            if momentum > 0.0:
+                if self.w_velocity is None:
+                    self.w_velocity = cp.zeros_like(self.weights)
+                self.w_velocity = momentum * self.w_velocity + self.w_grad + weight_decay_lambda * self.weights
+                self.weights -= learning_rate * self.w_velocity
+            else:
+                self.weights -= learning_rate * (self.w_grad + weight_decay_lambda * self.weights)
         if self.b_grad is not None:
-            self.biases -= self.b_grad * learning_rate
+            if momentum > 0.0:
+                if self.b_velocity is None:
+                    self.b_velocity = cp.zeros_like(self.biases)
+                self.b_velocity = momentum * self.b_velocity + self.b_grad
+                self.biases -= learning_rate * self.b_velocity
+            else:
+                self.biases -= self.b_grad * learning_rate

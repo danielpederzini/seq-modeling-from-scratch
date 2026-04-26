@@ -71,16 +71,17 @@ class EmbeddingLayer(BaseLayer):
         self.input_errors = output_errors
         return []
 
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
         Apply sparse gradient updates to the embedding matrix.
 
         Uses ``cp.add.at`` for scatter-add so only the looked-up rows are updated.
-        Weight decay is not applied to embeddings.
+        Weight decay and momentum are not applied to embeddings.
 
         Args:
             learning_rate: Step size for the gradient update.
             weight_decay_lambda: Unused; included for interface compatibility.
+            momentum: Unused; included for interface compatibility.
         """
         for indices, grad in zip(self.index_history, self.input_errors):
             cp.add.at(self.embeddings, indices, -learning_rate * grad)
