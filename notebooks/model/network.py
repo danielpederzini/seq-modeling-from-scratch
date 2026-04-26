@@ -3,6 +3,7 @@ import cupy as cp
 from .layer import BaseLayer, Layer
 from .embedding_layer import EmbeddingLayer
 from .recurrent_layer import RecurrentLayer
+from .gated_recurrent_layer import GatedRecurrentLayer
 from .softmax_layer import SoftmaxLayer
 
 class Network:
@@ -16,6 +17,7 @@ class Network:
     LAYER_TYPES: dict[str, type] = {
         "Embedding": EmbeddingLayer,
         "Recurrent": RecurrentLayer,
+        "GatedRecurrent": GatedRecurrentLayer,
         "Softmax": SoftmaxLayer
     }
     
@@ -123,7 +125,7 @@ class Network:
             dtype: Data type used when initializing recurrent states.
         """
         for layer in self.layers:
-            if isinstance(layer, RecurrentLayer):
+            if isinstance(layer, (RecurrentLayer, GatedRecurrentLayer)):
                 layer.reset_state(batch_size=batch_size, dtype=dtype)
             else:
                 layer.reset()
