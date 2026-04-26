@@ -1,13 +1,41 @@
 import cupy as cp
+from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 from .layer_commons import weights_from_he
 
-class Layer:
+class BaseLayer(ABC):
     """
-    Base fully connected layer for the neural network.
+    Abstract base class defining the interface all network layers must implement.
 
-    Implements the shared linear transformation, gradient computation, and
-    parameter update logic used by dense layers.
+    Network only depends on this contract — not on weights, biases, or any
+    specific implementation detail.
+    """
+
+    @abstractmethod
+    def forward(self, input: cp.ndarray) -> cp.ndarray: ...
+
+    @abstractmethod
+    def reset(self) -> None: ...
+
+    @abstractmethod
+    def backward_sequence(self, output_errors: list, batch_size: int) -> list: ...
+
+    @abstractmethod
+    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None: ...
+
+    @abstractmethod
+    def describe(self) -> str: ...
+
+    @abstractmethod
+    def parameter_count(self) -> int: ...
+
+
+class Layer(BaseLayer):
+    """
+    Base dense (fully-connected) layer.
+
+    Implements a shared linear transformation (input @ weights + biases).
+    Subclasses extend this with activation functions.
     """
     
     def __init__(self, weights: cp.ndarray, biases: cp.ndarray) -> None:
@@ -117,6 +145,29 @@ class Layer:
         self.b_grad = self.clip_grad(grad=cp.mean(output_error, axis=0))
         
         return output_error @ self.weights.T
+
+    def reset(self) -> None:
+        """
+        Reset any per-sequence state (e.g. input history). No-op for stateless layers.
+        """
+        pass
+
+    def backward_sequence(self, output_errors: list, batch_size: int) -> list:
+        """
+        Backward pass over a full sequence.
+
+        Default implementation for stateless layers: each timestep's gradient
+        is computed independently. Subclasses that maintain recurrent state or
+        accumulate history across timesteps must override this method.
+
+        Args:
+            output_errors: Per-timestep error gradients from the next layer
+            batch_size: Batch size used for gradient averaging
+
+        Returns:
+            Per-timestep error gradients for the previous layer
+        """
+        return [self.backward(e, batch_size) for e in output_errors]
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0) -> None:
         """
