@@ -16,6 +16,9 @@ def weights_from_he(input_size: int, num_neurons: int) -> cp.ndarray:
             size=(input_size, num_neurons)
         )
 
+def sigmoid(input: cp.ndarray) -> cp.ndarray:
+    return 1.0 / (1.0 + cp.exp(-input))
+
 def softmax(input: cp.ndarray) -> cp.ndarray:
     """
     Apply Softmax activation function with numerical stability.
