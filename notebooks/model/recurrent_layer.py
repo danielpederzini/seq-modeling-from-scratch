@@ -22,7 +22,6 @@ class RecurrentLayer(Layer):
         super().__init__(weights=weights, biases=biases)
         self.state_weights = state_weights
         self.state: Optional[cp.ndarray] = None
-        self.last_linear_output: Optional[cp.ndarray] = None
         self.last_prev_state: Optional[cp.ndarray] = None
         self.s_grad: Optional[cp.ndarray] = None
         self.state_error: Optional[cp.ndarray] = None
@@ -80,8 +79,7 @@ class RecurrentLayer(Layer):
         linear_output += prev_state @ self.state_weights
 
         self.last_prev_state = prev_state
-        self.last_linear_output = linear_output
-        output_state = cp.tanh(input=linear_output)
+        output_state = cp.tanh(linear_output)
         self.state = output_state
         return output_state
 
@@ -120,8 +118,7 @@ class RecurrentLayer(Layer):
         Returns:
             Error gradient to propagate to previous layer
         """
-        tanh_output = cp.tanh(input=self.last_linear_output)
-        tanh_grad = output_error * (1 - tanh_output ** 2)
+        tanh_grad = output_error * (1 - self.state ** 2)
 
         if self.last_prev_state is not None:
             state_grad = self.last_prev_state.T @ tanh_grad / batch_size

@@ -19,7 +19,7 @@ class ReluLayer(Layer):
             biases: Bias vector of shape (num_neurons,)
         """
         super().__init__(weights=weights, biases=biases)
-        self.last_linear_output: Optional[cp.ndarray] = None
+        self.last_output: Optional[cp.ndarray] = None
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "ReluLayer":
@@ -51,8 +51,8 @@ class ReluLayer(Layer):
             Activated output array of shape (batch_size, num_neurons)
         """
         linear_output = super().forward(input=input)
-        self.last_linear_output = linear_output
-        return cp.maximum(0, linear_output)
+        self.last_output = cp.maximum(0, linear_output)
+        return self.last_output
     
     def backward(self, output_error: cp.ndarray, batch_size: int) -> cp.ndarray:
         """
@@ -65,6 +65,6 @@ class ReluLayer(Layer):
         Returns:
             Error gradient to propagate to previous layer
         """
-        relu_grad = output_error * (self.last_linear_output > 0)
+        relu_grad = output_error * (self.last_output > 0)
         input_error = super().backward(output_error=relu_grad, batch_size=batch_size)
         return input_error
