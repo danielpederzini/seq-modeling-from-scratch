@@ -28,8 +28,8 @@ class RecurrentLayer(Layer):
         super().__init__(weights=weights, biases=biases)
         self.state_weights = state_weights
         self.state: Optional[cp.ndarray] = None
-        self.s_grad: Optional[cp.ndarray] = None
-        self.s_velocity: Optional[cp.ndarray] = None
+        self.state_weights_grad: Optional[cp.ndarray] = None
+        self.state_weights_velocity: Optional[cp.ndarray] = None
         self.input_errors: list[cp.ndarray] = []
         self.input_history: list[cp.ndarray] = []
         self.prev_state_history: list[cp.ndarray] = []
@@ -144,9 +144,9 @@ class RecurrentLayer(Layer):
             Per-timestep error gradients w.r.t. the input, for the previous layer
         """
         timesteps = len(output_errors)
-        accumulated_w_grad = cp.zeros_like(self.weights)
-        accumulated_s_grad = cp.zeros_like(self.state_weights)
-        accumulated_b_grad = cp.zeros_like(self.biases)
+        accumulated_weights_grad = cp.zeros_like(self.weights)
+        accumulated_state_weights_grad = cp.zeros_like(self.state_weights)
+        accumulated_biases_grad = cp.zeros_like(self.biases)
 
         accumulated_state_error = cp.zeros_like(self.state_history[0])
         input_error = cp.zeros_like(self.input_history[0])
@@ -161,17 +161,17 @@ class RecurrentLayer(Layer):
             accumulated_state_error += direct_error
             tanh_grad = accumulated_state_error * (1 - state ** 2)
 
-            accumulated_w_grad += input.T @ tanh_grad / batch_size
-            accumulated_s_grad += prev_state.T @ tanh_grad / batch_size
-            accumulated_b_grad += cp.mean(tanh_grad, axis=0)
+            accumulated_weights_grad += input.T @ tanh_grad / batch_size
+            accumulated_state_weights_grad += prev_state.T @ tanh_grad / batch_size
+            accumulated_biases_grad += cp.mean(tanh_grad, axis=0)
 
             input_error = tanh_grad @ self.weights.T
             per_step_input_errors.append(input_error)
             accumulated_state_error = tanh_grad @ self.state_weights.T
 
-        self.w_grad = self.clip_grad(grad=accumulated_w_grad / timesteps)
-        self.s_grad = self.clip_grad(grad=accumulated_s_grad / timesteps)
-        self.b_grad = accumulated_b_grad / timesteps
+        self.weights_grad = self.clip_grad(grad=accumulated_weights_grad / timesteps)
+        self.state_weights_grad = self.clip_grad(grad=accumulated_state_weights_grad / timesteps)
+        self.biases_grad = accumulated_biases_grad / timesteps
         self.input_errors = list(reversed(per_step_input_errors))
 
         return self.input_errors
@@ -191,13 +191,13 @@ class RecurrentLayer(Layer):
             momentum=momentum,
         )
 
-        if self.s_grad is not None:
+        if self.state_weights_grad is not None:
             if momentum > 0.0:
-                if self.s_velocity is None:
-                    self.s_velocity = cp.zeros_like(self.state_weights)
-                self.s_velocity = momentum * self.s_velocity + self.s_grad + weight_decay_lambda * self.state_weights
-                self.state_weights -= learning_rate * self.s_velocity
+                if self.state_weights_velocity is None:
+                    self.state_weights_velocity = cp.zeros_like(self.state_weights)
+                self.state_weights_velocity = momentum * self.state_weights_velocity + self.state_weights_grad + weight_decay_lambda * self.state_weights
+                self.state_weights -= learning_rate * self.state_weights_velocity
             else:
                 self.state_weights -= learning_rate * (
-                    self.s_grad + weight_decay_lambda * self.state_weights
+                    self.state_weights_grad + weight_decay_lambda * self.state_weights
                 )

@@ -59,9 +59,9 @@ class SoftmaxLayer(Layer):
         self.input_history = []
 
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
-        T = len(output_errors)
-        self.w_grad = self.clip_grad(
-            sum(inp.T @ e for inp, e in zip(self.input_history, output_errors)) / (batch_size * T)
+        timesteps = len(output_errors)
+        self.weights_grad = self.clip_grad(
+            sum(input.T @ error for input, error in zip(self.input_history, output_errors)) / (batch_size * timesteps)
         )
-        self.b_grad = sum(cp.mean(e, axis=0) for e in output_errors) / T
-        return [e @ self.weights.T for e in output_errors]
+        self.biases_grad = sum(cp.mean(error, axis=0) for error in output_errors) / timesteps
+        return [error @ self.weights.T for error in output_errors]
