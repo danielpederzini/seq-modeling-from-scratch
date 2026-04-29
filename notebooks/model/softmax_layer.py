@@ -1,5 +1,5 @@
 import cupy as cp
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .layer import Layer
 from .layer_commons import weights_from_he, softmax
 
@@ -58,10 +58,14 @@ class SoftmaxLayer(Layer):
     def reset(self) -> None:
         self.input_history = []
 
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         timesteps = len(output_errors)
         self.weights_grad = self.clip_grad(
-            sum(input.T @ error for input, error in zip(self.input_history, output_errors)) / (batch_size * timesteps)
+            sum(input.T @ error for input, error in zip(self.input_history, output_errors)) / (batch_size * timesteps),
+            clip_value=clip_value
         )
-        self.biases_grad = sum(cp.mean(error, axis=0) for error in output_errors) / timesteps
+        self.biases_grad = self.clip_grad(
+            sum(cp.mean(error, axis=0) for error in output_errors) / timesteps,
+            clip_value=clip_value
+        )
         return [error @ self.weights.T for error in output_errors]

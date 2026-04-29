@@ -201,7 +201,7 @@ class GatedRecurrentLayer(BaseLayer):
             + self.candidate_weights.size + self.candidate_recurrent_weights.size + self.candidate_biases.size
         )
 
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Backward pass over a full sequence chunk (BPTT).
 
@@ -273,15 +273,15 @@ class GatedRecurrentLayer(BaseLayer):
             )
             per_step_input_errors.append(input_error)
 
-        self.reset_weights_grad = self.clip_grad(grad=accumulated_reset_weights_grad / timesteps)
-        self.reset_recurrent_weights_grad = self.clip_grad(grad=accumulated_reset_recurrent_weights_grad / timesteps)
-        self.reset_biases_grad = accumulated_reset_biases_grad / timesteps
-        self.update_weights_grad = self.clip_grad(grad=accumulated_update_weights_grad / timesteps)
-        self.update_recurrent_weights_grad = self.clip_grad(grad=accumulated_update_recurrent_weights_grad / timesteps)
-        self.update_biases_grad = accumulated_update_biases_grad / timesteps
-        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps)
-        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps)
-        self.candidate_biases_grad = accumulated_candidate_biases_grad / timesteps
+        self.reset_weights_grad = self.clip_grad(grad=accumulated_reset_weights_grad / timesteps, clip_value=clip_value)
+        self.reset_recurrent_weights_grad = self.clip_grad(grad=accumulated_reset_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.reset_biases_grad = self.clip_grad(grad=accumulated_reset_biases_grad / timesteps, clip_value=clip_value)
+        self.update_weights_grad = self.clip_grad(grad=accumulated_update_weights_grad / timesteps, clip_value=clip_value)
+        self.update_recurrent_weights_grad = self.clip_grad(grad=accumulated_update_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.update_biases_grad = self.clip_grad(grad=accumulated_update_biases_grad / timesteps, clip_value=clip_value)
+        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
+        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
         self.input_errors = list(reversed(per_step_input_errors))
 
         return self.input_errors

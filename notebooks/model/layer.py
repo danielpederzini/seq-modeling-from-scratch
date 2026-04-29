@@ -18,7 +18,7 @@ class BaseLayer(ABC):
     def reset(self) -> None: ...
 
     @abstractmethod
-    def backward_sequence(self, output_errors: list, batch_size: int) -> list: ...
+    def backward_sequence(self, output_errors: list, batch_size: int, clip_value: Optional[float] = None) -> list: ...
 
     @abstractmethod
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None: ...
@@ -131,20 +131,22 @@ class Layer(BaseLayer):
         dot_product = input @ self.weights
         return dot_product + self.biases
     
-    def backward(self, output_error: cp.ndarray, batch_size: int) -> cp.ndarray:
+    def backward(self, output_error: cp.ndarray, batch_size: int, clip_value: Optional[float] = None) -> cp.ndarray:
         """
         Backward pass: compute gradients and propagate error.
         
         Args:
             output_error: Error gradient from the next layer
             batch_size: Size of the batch for gradient averaging
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
             
         Returns:
             Error gradient to propagate to previous layer
         """
         weights_grad = self.last_input.T @ output_error / batch_size
-        self.weights_grad = self.clip_grad(grad=weights_grad)
-        self.biases_grad = self.clip_grad(grad=cp.mean(output_error, axis=0))
+        self.weights_grad = self.clip_grad(grad=weights_grad, clip_value=clip_value)
+        self.biases_grad = self.clip_grad(grad=cp.mean(output_error, axis=0), clip_value=clip_value)
         
         return output_error @ self.weights.T
 
@@ -154,7 +156,7 @@ class Layer(BaseLayer):
         """
         pass
 
-    def backward_sequence(self, output_errors: list, batch_size: int) -> list:
+    def backward_sequence(self, output_errors: list, batch_size: int, clip_value: Optional[float] = None) -> list:
         """
         Backward pass over a full sequence.
 
@@ -165,11 +167,12 @@ class Layer(BaseLayer):
         Args:
             output_errors: Per-timestep error gradients from the next layer
             batch_size: Batch size used for gradient averaging
-
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
         Returns:
             Per-timestep error gradients for the previous layer
         """
-        return [self.backward(e, batch_size) for e in output_errors]
+        return [self.backward(error, batch_size, clip_value=clip_value) for error in output_errors]
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """

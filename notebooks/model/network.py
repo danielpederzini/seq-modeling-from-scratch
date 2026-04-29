@@ -1,4 +1,5 @@
 import copy
+from typing import Optional
 import cupy as cp
 from .layer import BaseLayer, Layer
 from .embedding_layer import EmbeddingLayer
@@ -132,7 +133,7 @@ class Network:
             else:
                 layer.reset()
 
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> None:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> None:
         """
         Backward pass over a full sequence chunk (BPTT).
 
@@ -143,10 +144,12 @@ class Network:
             output_errors: Per-timestep error gradients from the loss, one array
                 per timestep in chronological order
             batch_size: Batch size used for gradient averaging
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
         """
         current_errors = output_errors
         for layer in reversed(self.layers):
-            current_errors = layer.backward_sequence(current_errors, batch_size)
+            current_errors = layer.backward_sequence(current_errors, batch_size, clip_value=clip_value)
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """

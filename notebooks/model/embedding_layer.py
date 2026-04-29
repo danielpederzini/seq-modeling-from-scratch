@@ -1,5 +1,5 @@
 import cupy as cp
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .layer import BaseLayer
 
 class EmbeddingLayer(BaseLayer):
@@ -55,7 +55,7 @@ class EmbeddingLayer(BaseLayer):
         self.index_history = []
         self.input_errors = []
 
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Store per-step upstream gradients for use in ``update_parameters``.
 
@@ -64,6 +64,8 @@ class EmbeddingLayer(BaseLayer):
         Args:
             output_errors: Per-step gradient arrays propagated from the next layer.
             batch_size: Number of sequences in the batch (unused here).
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
 
         Returns:
             Empty list — no further layers receive gradients from embeddings.

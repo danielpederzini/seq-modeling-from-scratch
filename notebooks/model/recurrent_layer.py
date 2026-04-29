@@ -127,7 +127,7 @@ class RecurrentLayer(Layer):
         """
         return super().parameter_count() + int(self.state_weights.shape[0] * self.state_weights.shape[1])
     
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Backward pass over a full sequence chunk (BPTT).
 
@@ -139,6 +139,8 @@ class RecurrentLayer(Layer):
             output_errors: Per-timestep error gradients from the next layer,
                 in chronological order
             batch_size: Batch size used for gradient averaging
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
 
         Returns:
             Per-timestep error gradients w.r.t. the input, for the previous layer
@@ -169,9 +171,9 @@ class RecurrentLayer(Layer):
             per_step_input_errors.append(input_error)
             accumulated_state_error = tanh_grad @ self.state_weights.T
 
-        self.weights_grad = self.clip_grad(grad=accumulated_weights_grad / timesteps)
-        self.state_weights_grad = self.clip_grad(grad=accumulated_state_weights_grad / timesteps)
-        self.biases_grad = accumulated_biases_grad / timesteps
+        self.weights_grad = self.clip_grad(grad=accumulated_weights_grad / timesteps, clip_value=clip_value)
+        self.state_weights_grad = self.clip_grad(grad=accumulated_state_weights_grad / timesteps, clip_value=clip_value)
+        self.biases_grad = self.clip_grad(grad=accumulated_biases_grad / timesteps, clip_value=clip_value)
         self.input_errors = list(reversed(per_step_input_errors))
 
         return self.input_errors

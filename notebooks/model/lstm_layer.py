@@ -239,7 +239,7 @@ class LSTMLayer(BaseLayer):
             + self.candidate_weights.size + self.candidate_recurrent_weights.size + self.candidate_biases.size
         )
 
-    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int) -> list[cp.ndarray]:
+    def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Backward pass over a full sequence chunk (BPTT).
 
@@ -251,6 +251,8 @@ class LSTMLayer(BaseLayer):
             output_errors: Per-timestep error gradients from the next layer,
                 in chronological order
             batch_size: Batch size used for gradient averaging
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
 
         Returns:
             Per-timestep error gradients w.r.t. the input, for the previous layer
@@ -327,18 +329,18 @@ class LSTMLayer(BaseLayer):
             )
             per_step_input_errors.append(input_error)
 
-        self.forget_weights_grad = self.clip_grad(grad=accumulated_forget_weights_grad / timesteps)
-        self.forget_recurrent_weights_grad = self.clip_grad(grad=accumulated_forget_recurrent_weights_grad / timesteps)
-        self.forget_biases_grad = accumulated_forget_biases_grad / timesteps
-        self.input_weights_grad = self.clip_grad(grad=accumulated_input_weights_grad / timesteps)
-        self.input_recurrent_weights_grad = self.clip_grad(grad=accumulated_input_recurrent_weights_grad / timesteps)
-        self.input_biases_grad = accumulated_input_biases_grad / timesteps
-        self.output_weights_grad = self.clip_grad(grad=accumulated_output_weights_grad / timesteps)
-        self.output_recurrent_weights_grad = self.clip_grad(grad=accumulated_output_recurrent_weights_grad / timesteps)
-        self.output_biases_grad = accumulated_output_biases_grad / timesteps
-        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps)
-        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps)
-        self.candidate_biases_grad = accumulated_candidate_biases_grad / timesteps
+        self.forget_weights_grad = self.clip_grad(grad=accumulated_forget_weights_grad / timesteps, clip_value=clip_value)
+        self.forget_recurrent_weights_grad = self.clip_grad(grad=accumulated_forget_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.forget_biases_grad = self.clip_grad(grad=accumulated_forget_biases_grad / timesteps, clip_value=clip_value)
+        self.input_weights_grad = self.clip_grad(grad=accumulated_input_weights_grad / timesteps, clip_value=clip_value)
+        self.input_recurrent_weights_grad = self.clip_grad(grad=accumulated_input_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.input_biases_grad = self.clip_grad(grad=accumulated_input_biases_grad / timesteps, clip_value=clip_value)
+        self.output_weights_grad = self.clip_grad(grad=accumulated_output_weights_grad / timesteps, clip_value=clip_value)
+        self.output_recurrent_weights_grad = self.clip_grad(grad=accumulated_output_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.output_biases_grad = self.clip_grad(grad=accumulated_output_biases_grad / timesteps, clip_value=clip_value)
+        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
+        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self.candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
         self.input_errors = list(reversed(per_step_input_errors))
 
         return self.input_errors
