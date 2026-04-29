@@ -3,6 +3,7 @@ from typing import Optional
 import cupy as cp
 from .layer import BaseLayer, Layer
 from .embedding_layer import EmbeddingLayer
+from .dropout_layer import DropoutLayer
 from .recurrent_layer import RecurrentLayer
 from .gated_recurrent_layer import GatedRecurrentLayer
 from .lstm_layer import LSTMLayer
@@ -18,6 +19,7 @@ class Network:
     
     LAYER_TYPES: dict[str, type] = {
         "Embedding": EmbeddingLayer,
+        "Dropout": DropoutLayer,
         "Recurrent": RecurrentLayer,
         "GatedRecurrent": GatedRecurrentLayer,
         "LSTM": LSTMLayer,
@@ -132,6 +134,20 @@ class Network:
                 layer.reset_state(batch_size=batch_size, dtype=dtype)
             else:
                 layer.reset()
+    
+    def set_training(self, training: bool) -> None:
+        """
+        Set training mode for all layers.
+
+        Affects behavior of layers like DropoutLayer that behave differently
+        during training vs. evaluation.
+
+        Args:
+            training: True to enable training mode, False for evaluation mode
+        """
+        for layer in self.layers:
+            if hasattr(layer, "training"):
+                layer.training = training
 
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> None:
         """
