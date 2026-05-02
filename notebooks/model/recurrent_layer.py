@@ -151,8 +151,8 @@ class RecurrentLayer(Layer):
         accumulated_state_weights_grad = cp.zeros_like(self.state_weights)
         accumulated_biases_grad = cp.zeros_like(self.biases)
 
-        accumulated_state_error = cp.zeros_like(self.state_history[0])
-        input_error = cp.zeros_like(self.input_history[0])
+        accumulated_state_error = cp.zeros_like(self._state_history[0])
+        input_error = cp.zeros_like(self._input_history[0])
         per_step_input_errors = []
 
         for input, prev_state, state, direct_error in zip(
