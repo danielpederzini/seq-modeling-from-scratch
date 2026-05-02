@@ -75,3 +75,14 @@ class DropoutLayer(BaseLayer):
     def parameter_count(self) -> int:
         """Return 0 — dropout has no trainable parameters."""
         return 0
+    
+    def update_rate(self, new_rate: float) -> None:
+        """
+        Update the dropout rate.
+
+        Args:
+            new_rate: New dropout rate to apply during training. Must be in [0, 1).
+        """
+        if not 0 <= new_rate < 1:
+            raise ValueError("Dropout rate must be in [0, 1).")
+        self.rate = new_rate

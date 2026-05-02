@@ -149,6 +149,17 @@ class Network:
             if hasattr(layer, "training"):
                 layer.training = training
 
+    def update_dropout_rate(self, new_rate: float) -> None:
+        """
+        Update the dropout rate for all DropoutLayer instances in the network.
+
+        Args:
+            new_rate: New dropout rate to apply (between 0 and 1)
+        """
+        for layer in self.layers:
+            if isinstance(layer, DropoutLayer):
+                layer.update_rate(new_rate)
+
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> None:
         """
         Backward pass over a full sequence chunk (BPTT).
