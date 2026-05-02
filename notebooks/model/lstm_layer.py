@@ -123,7 +123,7 @@ class LSTMLayer(BaseLayer):
         return LSTMLayer(
             forget_weights=weights_from_xavier(input_size=input_size, num_neurons=num_neurons),
             forget_recurrent_weights=weights_from_xavier(input_size=num_neurons, num_neurons=num_neurons),
-            forget_biases=cp.zeros(shape=(num_neurons,)),
+            forget_biases=cp.ones(shape=(num_neurons,)),
             input_weights=weights_from_xavier(input_size=input_size, num_neurons=num_neurons),
             input_recurrent_weights=weights_from_xavier(input_size=num_neurons, num_neurons=num_neurons),
             input_biases=cp.zeros(shape=(num_neurons,)),
