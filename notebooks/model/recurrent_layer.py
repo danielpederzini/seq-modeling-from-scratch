@@ -28,12 +28,12 @@ class RecurrentLayer(Layer):
         super().__init__(weights=weights, biases=biases)
         self.state_weights = state_weights
         self.state: Optional[cp.ndarray] = None
-        self.state_weights_grad: Optional[cp.ndarray] = None
-        self.state_weights_velocity: Optional[cp.ndarray] = None
-        self.input_errors: list[cp.ndarray] = []
-        self.input_history: list[cp.ndarray] = []
-        self.prev_state_history: list[cp.ndarray] = []
-        self.state_history: list[cp.ndarray] = []
+        self._state_weights_grad: Optional[cp.ndarray] = None
+        self._state_weights_velocity: Optional[cp.ndarray] = None
+        self._input_errors: list[cp.ndarray] = []
+        self._input_history: list[cp.ndarray] = []
+        self._prev_state_history: list[cp.ndarray] = []
+        self._state_history: list[cp.ndarray] = []
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "RecurrentLayer":
@@ -69,12 +69,13 @@ class RecurrentLayer(Layer):
         else:
             self.state = cp.zeros((batch_size, self.biases.shape[0]), dtype=dtype)
 
-        self.input_history = []
-        self.prev_state_history = []
-        self.state_history = []        
-        self.input_errors = []
+        self._input_history = []
+        self._prev_state_history = []
+        self._state_history = []
+        self._input_errors = []
 
     def reset(self) -> None:
+        """Reset recurrent state and BPTT history. Delegates to reset_state()."""
         self.reset_state()
 
     def forward(self, input: cp.ndarray) -> cp.ndarray:
@@ -97,9 +98,9 @@ class RecurrentLayer(Layer):
         output_state = cp.tanh(linear_output)
         self.state = output_state
 
-        self.input_history.append(self.last_input)
-        self.prev_state_history.append(prev_state)
-        self.state_history.append(output_state)
+        self._input_history.append(self._last_input)
+        self._prev_state_history.append(prev_state)
+        self._state_history.append(output_state)
 
         return output_state
 
@@ -155,9 +156,9 @@ class RecurrentLayer(Layer):
         per_step_input_errors = []
 
         for input, prev_state, state, direct_error in zip(
-            reversed(self.input_history),
-            reversed(self.prev_state_history),
-            reversed(self.state_history),
+            reversed(self._input_history),
+            reversed(self._prev_state_history),
+            reversed(self._state_history),
             reversed(output_errors),
         ):
             accumulated_state_error += direct_error
@@ -171,12 +172,12 @@ class RecurrentLayer(Layer):
             per_step_input_errors.append(input_error)
             accumulated_state_error = tanh_grad @ self.state_weights.T
 
-        self.weights_grad = self.clip_grad(grad=accumulated_weights_grad / timesteps, clip_value=clip_value)
-        self.state_weights_grad = self.clip_grad(grad=accumulated_state_weights_grad / timesteps, clip_value=clip_value)
-        self.biases_grad = self.clip_grad(grad=accumulated_biases_grad / timesteps, clip_value=clip_value)
-        self.input_errors = list(reversed(per_step_input_errors))
+        self._weights_grad = self.clip_grad(grad=accumulated_weights_grad / timesteps, clip_value=clip_value)
+        self._state_weights_grad = self.clip_grad(grad=accumulated_state_weights_grad / timesteps, clip_value=clip_value)
+        self._biases_grad = self.clip_grad(grad=accumulated_biases_grad / timesteps, clip_value=clip_value)
+        self._input_errors = list(reversed(per_step_input_errors))
 
-        return self.input_errors
+        return self._input_errors
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
@@ -193,13 +194,13 @@ class RecurrentLayer(Layer):
             momentum=momentum,
         )
 
-        if self.state_weights_grad is not None:
+        if self._state_weights_grad is not None:
             if momentum > 0.0:
-                if self.state_weights_velocity is None:
-                    self.state_weights_velocity = cp.zeros_like(self.state_weights)
-                self.state_weights_velocity = momentum * self.state_weights_velocity + self.state_weights_grad + weight_decay_lambda * self.state_weights
-                self.state_weights -= learning_rate * self.state_weights_velocity
+                if self._state_weights_velocity is None:
+                    self._state_weights_velocity = cp.zeros_like(self.state_weights)
+                self._state_weights_velocity = momentum * self._state_weights_velocity + self._state_weights_grad + weight_decay_lambda * self.state_weights
+                self.state_weights -= learning_rate * self._state_weights_velocity
             else:
                 self.state_weights -= learning_rate * (
-                    self.state_weights_grad + weight_decay_lambda * self.state_weights
+                    self._state_weights_grad + weight_decay_lambda * self.state_weights
                 )

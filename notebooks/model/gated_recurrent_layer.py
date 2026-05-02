@@ -58,32 +58,32 @@ class GatedRecurrentLayer(BaseLayer):
         self.hidden_size: int = reset_biases.shape[0]
         self.state: Optional[cp.ndarray] = None
 
-        self.reset_weights_grad: Optional[cp.ndarray] = None
-        self.reset_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.reset_biases_grad: Optional[cp.ndarray] = None
-        self.update_weights_grad: Optional[cp.ndarray] = None
-        self.update_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.update_biases_grad: Optional[cp.ndarray] = None
-        self.candidate_weights_grad: Optional[cp.ndarray] = None
-        self.candidate_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.candidate_biases_grad: Optional[cp.ndarray] = None
+        self._reset_weights_grad: Optional[cp.ndarray] = None
+        self._reset_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._reset_biases_grad: Optional[cp.ndarray] = None
+        self._update_weights_grad: Optional[cp.ndarray] = None
+        self._update_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._update_biases_grad: Optional[cp.ndarray] = None
+        self._candidate_weights_grad: Optional[cp.ndarray] = None
+        self._candidate_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._candidate_biases_grad: Optional[cp.ndarray] = None
 
-        self.reset_weights_velocity: Optional[cp.ndarray] = None
-        self.reset_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.reset_biases_velocity: Optional[cp.ndarray] = None
-        self.update_weights_velocity: Optional[cp.ndarray] = None
-        self.update_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.update_biases_velocity: Optional[cp.ndarray] = None
-        self.candidate_weights_velocity: Optional[cp.ndarray] = None
-        self.candidate_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.candidate_biases_velocity: Optional[cp.ndarray] = None
+        self._reset_weights_velocity: Optional[cp.ndarray] = None
+        self._reset_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._reset_biases_velocity: Optional[cp.ndarray] = None
+        self._update_weights_velocity: Optional[cp.ndarray] = None
+        self._update_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._update_biases_velocity: Optional[cp.ndarray] = None
+        self._candidate_weights_velocity: Optional[cp.ndarray] = None
+        self._candidate_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._candidate_biases_velocity: Optional[cp.ndarray] = None
 
-        self.input_history: list[cp.ndarray] = []
-        self.prev_state_history: list[cp.ndarray] = []
-        self.reset_gate_history: list[cp.ndarray] = []
-        self.update_gate_history: list[cp.ndarray] = []
-        self.candidate_history: list[cp.ndarray] = []
-        self.input_errors: list[cp.ndarray] = []
+        self._input_history: list[cp.ndarray] = []
+        self._prev_state_history: list[cp.ndarray] = []
+        self._reset_gate_history: list[cp.ndarray] = []
+        self._update_gate_history: list[cp.ndarray] = []
+        self._candidate_history: list[cp.ndarray] = []
+        self._input_errors: list[cp.ndarray] = []
 
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "GatedRecurrentLayer":
@@ -125,17 +125,19 @@ class GatedRecurrentLayer(BaseLayer):
         else:
             self.state = cp.zeros((batch_size, self.hidden_size), dtype=dtype)
 
-        self.input_history = []
-        self.prev_state_history = []
-        self.reset_gate_history = []
-        self.update_gate_history = []
-        self.candidate_history = []
-        self.input_errors = []
+        self._input_history = []
+        self._prev_state_history = []
+        self._reset_gate_history = []
+        self._update_gate_history = []
+        self._candidate_history = []
+        self._input_errors = []
 
     def reset(self) -> None:
+        """Reset recurrent state and BPTT history. Delegates to reset_state()."""
         self.reset_state()
 
     def clip_grad(self, grad: cp.ndarray, clip_value: Optional[float] = None) -> cp.ndarray:
+        """Clip gradient by L2 norm. Returns grad unchanged when clip_value is None."""
         if clip_value is None:
             return grad
         norm = cp.linalg.norm(grad)
@@ -166,11 +168,11 @@ class GatedRecurrentLayer(BaseLayer):
         new_state = (1.0 - update_gate) * prev_state + update_gate * candidate
         self.state = new_state
 
-        self.input_history.append(input)
-        self.prev_state_history.append(prev_state)
-        self.reset_gate_history.append(reset_gate)
-        self.update_gate_history.append(update_gate)
-        self.candidate_history.append(candidate)
+        self._input_history.append(input)
+        self._prev_state_history.append(prev_state)
+        self._reset_gate_history.append(reset_gate)
+        self._update_gate_history.append(update_gate)
+        self._candidate_history.append(candidate)
 
         return new_state
 
@@ -229,15 +231,15 @@ class GatedRecurrentLayer(BaseLayer):
         accumulated_candidate_recurrent_weights_grad = cp.zeros_like(self.candidate_recurrent_weights)
         accumulated_candidate_biases_grad = cp.zeros_like(self.candidate_biases)
 
-        accumulated_state_error = cp.zeros_like(self.prev_state_history[0])
+        accumulated_state_error = cp.zeros_like(self._prev_state_history[0])
         per_step_input_errors = []
 
         for input, prev_state, reset_gate, update_gate, candidate, direct_error in zip(
-            reversed(self.input_history),
-            reversed(self.prev_state_history),
-            reversed(self.reset_gate_history),
-            reversed(self.update_gate_history),
-            reversed(self.candidate_history),
+            reversed(self._input_history),
+            reversed(self._prev_state_history),
+            reversed(self._reset_gate_history),
+            reversed(self._update_gate_history),
+            reversed(self._candidate_history),
             reversed(output_errors),
         ):
             state_error = accumulated_state_error + direct_error
@@ -273,18 +275,18 @@ class GatedRecurrentLayer(BaseLayer):
             )
             per_step_input_errors.append(input_error)
 
-        self.reset_weights_grad = self.clip_grad(grad=accumulated_reset_weights_grad / timesteps, clip_value=clip_value)
-        self.reset_recurrent_weights_grad = self.clip_grad(grad=accumulated_reset_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.reset_biases_grad = self.clip_grad(grad=accumulated_reset_biases_grad / timesteps, clip_value=clip_value)
-        self.update_weights_grad = self.clip_grad(grad=accumulated_update_weights_grad / timesteps, clip_value=clip_value)
-        self.update_recurrent_weights_grad = self.clip_grad(grad=accumulated_update_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.update_biases_grad = self.clip_grad(grad=accumulated_update_biases_grad / timesteps, clip_value=clip_value)
-        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
-        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
-        self.input_errors = list(reversed(per_step_input_errors))
+        self._reset_weights_grad = self.clip_grad(grad=accumulated_reset_weights_grad / timesteps, clip_value=clip_value)
+        self._reset_recurrent_weights_grad = self.clip_grad(grad=accumulated_reset_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._reset_biases_grad = self.clip_grad(grad=accumulated_reset_biases_grad / timesteps, clip_value=clip_value)
+        self._update_weights_grad = self.clip_grad(grad=accumulated_update_weights_grad / timesteps, clip_value=clip_value)
+        self._update_recurrent_weights_grad = self.clip_grad(grad=accumulated_update_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._update_biases_grad = self.clip_grad(grad=accumulated_update_biases_grad / timesteps, clip_value=clip_value)
+        self._candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
+        self._candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
+        self._input_errors = list(reversed(per_step_input_errors))
 
-        return self.input_errors
+        return self._input_errors
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
@@ -296,17 +298,17 @@ class GatedRecurrentLayer(BaseLayer):
             momentum: Momentum coefficient passed through to all parameter updates
         """
         weight_params = [
-            ("reset_weights", "reset_weights_grad", "reset_weights_velocity"),
-            ("reset_recurrent_weights", "reset_recurrent_weights_grad", "reset_recurrent_weights_velocity"),
-            ("update_weights", "update_weights_grad", "update_weights_velocity"),
-            ("update_recurrent_weights", "update_recurrent_weights_grad", "update_recurrent_weights_velocity"),
-            ("candidate_weights", "candidate_weights_grad", "candidate_weights_velocity"),
-            ("candidate_recurrent_weights", "candidate_recurrent_weights_grad", "candidate_recurrent_weights_velocity"),
+            ("reset_weights", "_reset_weights_grad", "_reset_weights_velocity"),
+            ("reset_recurrent_weights", "_reset_recurrent_weights_grad", "_reset_recurrent_weights_velocity"),
+            ("update_weights", "_update_weights_grad", "_update_weights_velocity"),
+            ("update_recurrent_weights", "_update_recurrent_weights_grad", "_update_recurrent_weights_velocity"),
+            ("candidate_weights", "_candidate_weights_grad", "_candidate_weights_velocity"),
+            ("candidate_recurrent_weights", "_candidate_recurrent_weights_grad", "_candidate_recurrent_weights_velocity"),
         ]
         bias_params = [
-            ("reset_biases", "reset_biases_grad", "reset_biases_velocity"),
-            ("update_biases", "update_biases_grad", "update_biases_velocity"),
-            ("candidate_biases", "candidate_biases_grad", "candidate_biases_velocity"),
+            ("reset_biases", "_reset_biases_grad", "_reset_biases_velocity"),
+            ("update_biases", "_update_biases_grad", "_update_biases_velocity"),
+            ("candidate_biases", "_candidate_biases_grad", "_candidate_biases_velocity"),
         ]
 
         for param_name, grad_name, vel_name in weight_params:

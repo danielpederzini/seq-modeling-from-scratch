@@ -48,11 +48,11 @@ class Layer(BaseLayer):
         """
         self.weights = weights
         self.biases = biases
-        self.last_input: Optional[cp.ndarray] = None
-        self.weights_grad: Optional[cp.ndarray] = None
-        self.biases_grad: Optional[cp.ndarray] = None
-        self.weights_velocity: Optional[cp.ndarray] = None
-        self.biases_velocity: Optional[cp.ndarray] = None
+        self._last_input: Optional[cp.ndarray] = None
+        self._weights_grad: Optional[cp.ndarray] = None
+        self._biases_grad: Optional[cp.ndarray] = None
+        self._weights_velocity: Optional[cp.ndarray] = None
+        self._biases_velocity: Optional[cp.ndarray] = None
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "Layer":
@@ -127,7 +127,7 @@ class Layer(BaseLayer):
         Returns:
             Output array of shape (batch_size, num_neurons)
         """
-        self.last_input = input
+        self._last_input = input
         dot_product = input @ self.weights
         return dot_product + self.biases
     
@@ -144,9 +144,9 @@ class Layer(BaseLayer):
         Returns:
             Error gradient to propagate to previous layer
         """
-        weights_grad = self.last_input.T @ output_error / batch_size
-        self.weights_grad = self.clip_grad(grad=weights_grad, clip_value=clip_value)
-        self.biases_grad = self.clip_grad(grad=cp.mean(output_error, axis=0), clip_value=clip_value)
+        weights_grad = self._last_input.T @ output_error / batch_size
+        self._weights_grad = self.clip_grad(grad=weights_grad, clip_value=clip_value)
+        self._biases_grad = self.clip_grad(grad=cp.mean(output_error, axis=0), clip_value=clip_value)
         
         return output_error @ self.weights.T
 
@@ -191,19 +191,19 @@ class Layer(BaseLayer):
             weight_decay_lambda: Regularization parameter for weight decay
             momentum: Momentum coefficient (0 disables momentum)
         """
-        if self.weights_grad is not None:
+        if self._weights_grad is not None:
             if momentum > 0.0:
-                if self.weights_velocity is None:
-                    self.weights_velocity = cp.zeros_like(self.weights)
-                self.weights_velocity = momentum * self.weights_velocity + self.weights_grad + weight_decay_lambda * self.weights
-                self.weights -= learning_rate * self.weights_velocity
+                if self._weights_velocity is None:
+                    self._weights_velocity = cp.zeros_like(self.weights)
+                self._weights_velocity = momentum * self._weights_velocity + self._weights_grad + weight_decay_lambda * self.weights
+                self.weights -= learning_rate * self._weights_velocity
             else:
-                self.weights -= learning_rate * (self.weights_grad + weight_decay_lambda * self.weights)
-        if self.biases_grad is not None:
+                self.weights -= learning_rate * (self._weights_grad + weight_decay_lambda * self.weights)
+        if self._biases_grad is not None:
             if momentum > 0.0:
-                if self.biases_velocity is None:
-                    self.biases_velocity = cp.zeros_like(self.biases)
-                self.biases_velocity = momentum * self.biases_velocity + self.biases_grad
-                self.biases -= learning_rate * self.biases_velocity
+                if self._biases_velocity is None:
+                    self._biases_velocity = cp.zeros_like(self.biases)
+                self._biases_velocity = momentum * self._biases_velocity + self._biases_grad
+                self.biases -= learning_rate * self._biases_velocity
             else:
-                self.biases -= self.biases_grad * learning_rate
+                self.biases -= self._biases_grad * learning_rate

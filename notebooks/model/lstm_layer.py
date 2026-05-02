@@ -70,41 +70,41 @@ class LSTMLayer(BaseLayer):
         self.hidden_state: Optional[cp.ndarray] = None
         self.cell_state: Optional[cp.ndarray] = None
 
-        self.forget_weights_grad: Optional[cp.ndarray] = None
-        self.forget_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.forget_biases_grad: Optional[cp.ndarray] = None
-        self.input_weights_grad: Optional[cp.ndarray] = None
-        self.input_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.input_biases_grad: Optional[cp.ndarray] = None
-        self.output_weights_grad: Optional[cp.ndarray] = None
-        self.output_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.output_biases_grad: Optional[cp.ndarray] = None
-        self.candidate_weights_grad: Optional[cp.ndarray] = None
-        self.candidate_recurrent_weights_grad: Optional[cp.ndarray] = None
-        self.candidate_biases_grad: Optional[cp.ndarray] = None
+        self._forget_weights_grad: Optional[cp.ndarray] = None
+        self._forget_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._forget_biases_grad: Optional[cp.ndarray] = None
+        self._input_weights_grad: Optional[cp.ndarray] = None
+        self._input_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._input_biases_grad: Optional[cp.ndarray] = None
+        self._output_weights_grad: Optional[cp.ndarray] = None
+        self._output_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._output_biases_grad: Optional[cp.ndarray] = None
+        self._candidate_weights_grad: Optional[cp.ndarray] = None
+        self._candidate_recurrent_weights_grad: Optional[cp.ndarray] = None
+        self._candidate_biases_grad: Optional[cp.ndarray] = None
 
-        self.forget_weights_velocity: Optional[cp.ndarray] = None
-        self.forget_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.forget_biases_velocity: Optional[cp.ndarray] = None
-        self.input_weights_velocity: Optional[cp.ndarray] = None
-        self.input_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.input_biases_velocity: Optional[cp.ndarray] = None
-        self.output_weights_velocity: Optional[cp.ndarray] = None
-        self.output_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.output_biases_velocity: Optional[cp.ndarray] = None
-        self.candidate_weights_velocity: Optional[cp.ndarray] = None
-        self.candidate_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self.candidate_biases_velocity: Optional[cp.ndarray] = None
+        self._forget_weights_velocity: Optional[cp.ndarray] = None
+        self._forget_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._forget_biases_velocity: Optional[cp.ndarray] = None
+        self._input_weights_velocity: Optional[cp.ndarray] = None
+        self._input_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._input_biases_velocity: Optional[cp.ndarray] = None
+        self._output_weights_velocity: Optional[cp.ndarray] = None
+        self._output_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._output_biases_velocity: Optional[cp.ndarray] = None
+        self._candidate_weights_velocity: Optional[cp.ndarray] = None
+        self._candidate_recurrent_weights_velocity: Optional[cp.ndarray] = None
+        self._candidate_biases_velocity: Optional[cp.ndarray] = None
 
-        self.input_history: list[cp.ndarray] = []
-        self.prev_hidden_history: list[cp.ndarray] = []
-        self.prev_cell_history: list[cp.ndarray] = []
-        self.forget_gate_history: list[cp.ndarray] = []
-        self.input_gate_history: list[cp.ndarray] = []
-        self.output_gate_history: list[cp.ndarray] = []
-        self.candidate_history: list[cp.ndarray] = []
-        self.cell_state_history: list[cp.ndarray] = []
-        self.input_errors: list[cp.ndarray] = []
+        self._input_history: list[cp.ndarray] = []
+        self._prev_hidden_history: list[cp.ndarray] = []
+        self._prev_cell_history: list[cp.ndarray] = []
+        self._forget_gate_history: list[cp.ndarray] = []
+        self._input_gate_history: list[cp.ndarray] = []
+        self._output_gate_history: list[cp.ndarray] = []
+        self._candidate_history: list[cp.ndarray] = []
+        self._cell_state_history: list[cp.ndarray] = []
+        self._input_errors: list[cp.ndarray] = []
 
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "LSTMLayer":
@@ -151,20 +151,22 @@ class LSTMLayer(BaseLayer):
             self.hidden_state = cp.zeros((batch_size, self.hidden_size), dtype=dtype)
             self.cell_state = cp.zeros((batch_size, self.hidden_size), dtype=dtype)
 
-        self.input_history = []
-        self.prev_hidden_history = []
-        self.prev_cell_history = []
-        self.forget_gate_history = []
-        self.input_gate_history = []
-        self.output_gate_history = []
-        self.candidate_history = []
-        self.cell_state_history = []
-        self.input_errors = []
+        self._input_history = []
+        self._prev_hidden_history = []
+        self._prev_cell_history = []
+        self._forget_gate_history = []
+        self._input_gate_history = []
+        self._output_gate_history = []
+        self._candidate_history = []
+        self._cell_state_history = []
+        self._input_errors = []
 
     def reset(self) -> None:
+        """Reset recurrent states and BPTT history. Delegates to reset_state()."""
         self.reset_state()
 
     def clip_grad(self, grad: cp.ndarray, clip_value: Optional[float] = None) -> cp.ndarray:
+        """Clip gradient by L2 norm. Returns grad unchanged when clip_value is None."""
         if clip_value is None:
             return grad
         norm = cp.linalg.norm(grad)
@@ -200,14 +202,14 @@ class LSTMLayer(BaseLayer):
         self.hidden_state = new_hidden
         self.cell_state = new_cell
 
-        self.input_history.append(input)
-        self.prev_hidden_history.append(prev_hidden)
-        self.prev_cell_history.append(prev_cell)
-        self.forget_gate_history.append(forget_gate)
-        self.input_gate_history.append(input_gate)
-        self.output_gate_history.append(output_gate)
-        self.candidate_history.append(candidate)
-        self.cell_state_history.append(new_cell)
+        self._input_history.append(input)
+        self._prev_hidden_history.append(prev_hidden)
+        self._prev_cell_history.append(prev_cell)
+        self._forget_gate_history.append(forget_gate)
+        self._input_gate_history.append(input_gate)
+        self._output_gate_history.append(output_gate)
+        self._candidate_history.append(candidate)
+        self._cell_state_history.append(new_cell)
 
         return new_hidden
 
@@ -272,19 +274,19 @@ class LSTMLayer(BaseLayer):
         accumulated_candidate_recurrent_weights_grad = cp.zeros_like(self.candidate_recurrent_weights)
         accumulated_candidate_biases_grad = cp.zeros_like(self.candidate_biases)
 
-        accumulated_hidden_error = cp.zeros_like(self.prev_hidden_history[0])
-        accumulated_cell_error = cp.zeros_like(self.prev_cell_history[0])
+        accumulated_hidden_error = cp.zeros_like(self._prev_hidden_history[0])
+        accumulated_cell_error = cp.zeros_like(self._prev_cell_history[0])
         per_step_input_errors = []
 
         for input, prev_hidden, prev_cell, forget_gate, input_gate, output_gate, candidate, cell_state, direct_error in zip(
-            reversed(self.input_history),
-            reversed(self.prev_hidden_history),
-            reversed(self.prev_cell_history),
-            reversed(self.forget_gate_history),
-            reversed(self.input_gate_history),
-            reversed(self.output_gate_history),
-            reversed(self.candidate_history),
-            reversed(self.cell_state_history),
+            reversed(self._input_history),
+            reversed(self._prev_hidden_history),
+            reversed(self._prev_cell_history),
+            reversed(self._forget_gate_history),
+            reversed(self._input_gate_history),
+            reversed(self._output_gate_history),
+            reversed(self._candidate_history),
+            reversed(self._cell_state_history),
             reversed(output_errors),
         ):
             hidden_error = accumulated_hidden_error + direct_error
@@ -329,21 +331,21 @@ class LSTMLayer(BaseLayer):
             )
             per_step_input_errors.append(input_error)
 
-        self.forget_weights_grad = self.clip_grad(grad=accumulated_forget_weights_grad / timesteps, clip_value=clip_value)
-        self.forget_recurrent_weights_grad = self.clip_grad(grad=accumulated_forget_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.forget_biases_grad = self.clip_grad(grad=accumulated_forget_biases_grad / timesteps, clip_value=clip_value)
-        self.input_weights_grad = self.clip_grad(grad=accumulated_input_weights_grad / timesteps, clip_value=clip_value)
-        self.input_recurrent_weights_grad = self.clip_grad(grad=accumulated_input_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.input_biases_grad = self.clip_grad(grad=accumulated_input_biases_grad / timesteps, clip_value=clip_value)
-        self.output_weights_grad = self.clip_grad(grad=accumulated_output_weights_grad / timesteps, clip_value=clip_value)
-        self.output_recurrent_weights_grad = self.clip_grad(grad=accumulated_output_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.output_biases_grad = self.clip_grad(grad=accumulated_output_biases_grad / timesteps, clip_value=clip_value)
-        self.candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
-        self.candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
-        self.candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
-        self.input_errors = list(reversed(per_step_input_errors))
+        self._forget_weights_grad = self.clip_grad(grad=accumulated_forget_weights_grad / timesteps, clip_value=clip_value)
+        self._forget_recurrent_weights_grad = self.clip_grad(grad=accumulated_forget_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._forget_biases_grad = self.clip_grad(grad=accumulated_forget_biases_grad / timesteps, clip_value=clip_value)
+        self._input_weights_grad = self.clip_grad(grad=accumulated_input_weights_grad / timesteps, clip_value=clip_value)
+        self._input_recurrent_weights_grad = self.clip_grad(grad=accumulated_input_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._input_biases_grad = self.clip_grad(grad=accumulated_input_biases_grad / timesteps, clip_value=clip_value)
+        self._output_weights_grad = self.clip_grad(grad=accumulated_output_weights_grad / timesteps, clip_value=clip_value)
+        self._output_recurrent_weights_grad = self.clip_grad(grad=accumulated_output_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._output_biases_grad = self.clip_grad(grad=accumulated_output_biases_grad / timesteps, clip_value=clip_value)
+        self._candidate_weights_grad = self.clip_grad(grad=accumulated_candidate_weights_grad / timesteps, clip_value=clip_value)
+        self._candidate_recurrent_weights_grad = self.clip_grad(grad=accumulated_candidate_recurrent_weights_grad / timesteps, clip_value=clip_value)
+        self._candidate_biases_grad = self.clip_grad(grad=accumulated_candidate_biases_grad / timesteps, clip_value=clip_value)
+        self._input_errors = list(reversed(per_step_input_errors))
 
-        return self.input_errors
+        return self._input_errors
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
         """
@@ -355,20 +357,20 @@ class LSTMLayer(BaseLayer):
             momentum: Momentum coefficient passed through to all parameter updates
         """
         weight_params = [
-            ("forget_weights", "forget_weights_grad", "forget_weights_velocity"),
-            ("forget_recurrent_weights", "forget_recurrent_weights_grad", "forget_recurrent_weights_velocity"),
-            ("input_weights", "input_weights_grad", "input_weights_velocity"),
-            ("input_recurrent_weights", "input_recurrent_weights_grad", "input_recurrent_weights_velocity"),
-            ("output_weights", "output_weights_grad", "output_weights_velocity"),
-            ("output_recurrent_weights", "output_recurrent_weights_grad", "output_recurrent_weights_velocity"),
-            ("candidate_weights", "candidate_weights_grad", "candidate_weights_velocity"),
-            ("candidate_recurrent_weights", "candidate_recurrent_weights_grad", "candidate_recurrent_weights_velocity"),
+            ("forget_weights", "_forget_weights_grad", "_forget_weights_velocity"),
+            ("forget_recurrent_weights", "_forget_recurrent_weights_grad", "_forget_recurrent_weights_velocity"),
+            ("input_weights", "_input_weights_grad", "_input_weights_velocity"),
+            ("input_recurrent_weights", "_input_recurrent_weights_grad", "_input_recurrent_weights_velocity"),
+            ("output_weights", "_output_weights_grad", "_output_weights_velocity"),
+            ("output_recurrent_weights", "_output_recurrent_weights_grad", "_output_recurrent_weights_velocity"),
+            ("candidate_weights", "_candidate_weights_grad", "_candidate_weights_velocity"),
+            ("candidate_recurrent_weights", "_candidate_recurrent_weights_grad", "_candidate_recurrent_weights_velocity"),
         ]
         bias_params = [
-            ("forget_biases", "forget_biases_grad", "forget_biases_velocity"),
-            ("input_biases", "input_biases_grad", "input_biases_velocity"),
-            ("output_biases", "output_biases_grad", "output_biases_velocity"),
-            ("candidate_biases", "candidate_biases_grad", "candidate_biases_velocity"),
+            ("forget_biases", "_forget_biases_grad", "_forget_biases_velocity"),
+            ("input_biases", "_input_biases_grad", "_input_biases_velocity"),
+            ("output_biases", "_output_biases_grad", "_output_biases_velocity"),
+            ("candidate_biases", "_candidate_biases_grad", "_candidate_biases_velocity"),
         ]
 
         for param_name, grad_name, vel_name in weight_params:

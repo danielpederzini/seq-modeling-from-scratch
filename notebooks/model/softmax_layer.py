@@ -20,7 +20,7 @@ class SoftmaxLayer(Layer):
             biases: Bias vector of shape (num_neurons,)
         """
         super().__init__(weights=weights, biases=biases)
-        self.input_history: list[cp.ndarray] = []
+        self._input_history: list[cp.ndarray] = []
     
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "SoftmaxLayer":
@@ -52,19 +52,36 @@ class SoftmaxLayer(Layer):
             Softmax output probabilities of shape (batch_size, num_neurons)
         """
         linear_output = super().forward(input=input)
-        self.input_history.append(self.last_input)
+        self._input_history.append(self._last_input)
         return softmax(input=linear_output)
 
     def reset(self) -> None:
-        self.input_history = []
+        """Clear stored input history between sequences."""
+        self._input_history = []
 
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
+        """
+        Backward pass over a full sequence.
+
+        Accumulates weight and bias gradients across all timesteps, then
+        propagates per-timestep input errors to the previous layer.
+
+        Args:
+            output_errors: Per-timestep error gradients from the loss, one array
+                per timestep in chronological order.
+            batch_size: Batch size used for gradient averaging.
+            clip_value: Maximum allowed L2 norm for the gradient. If None,
+                clipping is disabled.
+
+        Returns:
+            Per-timestep error gradients w.r.t. the input, for the previous layer.
+        """
         timesteps = len(output_errors)
-        self.weights_grad = self.clip_grad(
-            sum(input.T @ error for input, error in zip(self.input_history, output_errors)) / (batch_size * timesteps),
+        self._weights_grad = self.clip_grad(
+            sum(input.T @ error for input, error in zip(self._input_history, output_errors)) / (batch_size * timesteps),
             clip_value=clip_value
         )
-        self.biases_grad = self.clip_grad(
+        self._biases_grad = self.clip_grad(
             sum(cp.mean(error, axis=0) for error in output_errors) / timesteps,
             clip_value=clip_value
         )

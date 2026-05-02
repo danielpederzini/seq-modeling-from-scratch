@@ -17,6 +17,7 @@ def weights_from_he(input_size: int, num_neurons: int) -> cp.ndarray:
         )
 
 def sigmoid(input: cp.ndarray) -> cp.ndarray:
+    """Apply element-wise sigmoid activation: f(x) = 1 / (1 + exp(-x))."""
     return 1.0 / (1.0 + cp.exp(-input))
 
 def softmax(input: cp.ndarray) -> cp.ndarray:

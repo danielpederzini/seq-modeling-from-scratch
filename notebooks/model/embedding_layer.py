@@ -16,8 +16,8 @@ class EmbeddingLayer(BaseLayer):
             embeddings: Weight matrix of shape (num_embeddings, embedding_dim).
         """
         self.embeddings = embeddings
-        self.index_history: list[cp.ndarray] = []
-        self.input_errors: list[cp.ndarray] = []
+        self._index_history: list[cp.ndarray] = []
+        self._input_errors: list[cp.ndarray] = []
 
     @staticmethod
     def from_definition(definition: Dict[str, Any]) -> "EmbeddingLayer":
@@ -47,13 +47,13 @@ class EmbeddingLayer(BaseLayer):
             Embedding vectors of shape (batch_size, embedding_dim) or
             (batch_size, T, embedding_dim).
         """
-        self.index_history.append(input)
+        self._index_history.append(input)
         return self.embeddings[input]
 
     def reset(self) -> None:
         """Clear index and gradient histories between sequences."""
-        self.index_history = []
-        self.input_errors = []
+        self._index_history = []
+        self._input_errors = []
 
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
@@ -70,7 +70,7 @@ class EmbeddingLayer(BaseLayer):
         Returns:
             Empty list — no further layers receive gradients from embeddings.
         """
-        self.input_errors = output_errors
+        self._input_errors = output_errors
         return []
 
     def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
@@ -85,12 +85,14 @@ class EmbeddingLayer(BaseLayer):
             weight_decay_lambda: Unused; included for interface compatibility.
             momentum: Unused; included for interface compatibility.
         """
-        for indices, grad in zip(self.index_history, self.input_errors):
+        for indices, grad in zip(self._index_history, self._input_errors):
             cp.add.at(self.embeddings, indices, -learning_rate * grad)
 
     def describe(self) -> str:
+        """Return a formatted description of the embedding matrix shape and parameter count."""
         shape = self.embeddings.shape
         return f"EmbeddingLayer\n  Embeddings Shape: {shape}\n  Parameters: {self.parameter_count():,}"
 
     def parameter_count(self) -> int:
+        """Return the total number of trainable parameters (num_embeddings * embedding_dim)."""
         return int(self.embeddings.shape[0] * self.embeddings.shape[1])
