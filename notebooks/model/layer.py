@@ -29,6 +29,16 @@ class BaseLayer(ABC):
     @abstractmethod
     def parameter_count(self) -> int: ...
 
+    def parameter_items(self) -> list[tuple]:
+        """
+        Return (name, param, grad, apply_weight_decay) tuples for all trainable parameters.
+
+        Used by external optimizers (e.g. AdamW) to iterate over parameters without
+        coupling to each layer's internal update logic. Returns an empty list by default;
+        layers with trainable parameters must override this method.
+        """
+        return []
+
 
 class Layer(BaseLayer):
     """
@@ -95,6 +105,12 @@ class Layer(BaseLayer):
             Total number of trainable parameters
         """
         return int(self.weights.shape[0] * self.weights.shape[1] + self.biases.shape[0])
+
+    def parameter_items(self) -> list[tuple]:
+        return [
+            ("weights", self.weights, self._weights_grad, True),
+            ("biases", self.biases, self._biases_grad, False),
+        ]
         
     def clip_grad(self, grad: cp.ndarray, clip_value: Optional[float] = None) -> cp.ndarray:
         """

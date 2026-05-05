@@ -203,6 +203,19 @@ class GatedRecurrentLayer(BaseLayer):
             + self.candidate_weights.size + self.candidate_recurrent_weights.size + self.candidate_biases.size
         )
 
+    def parameter_items(self) -> list[tuple]:
+        return [
+            ("reset_weights", self.reset_weights, self._reset_weights_grad, True),
+            ("reset_recurrent_weights", self.reset_recurrent_weights, self._reset_recurrent_weights_grad, True),
+            ("reset_biases", self.reset_biases, self._reset_biases_grad, False),
+            ("update_weights", self.update_weights, self._update_weights_grad, True),
+            ("update_recurrent_weights", self.update_recurrent_weights, self._update_recurrent_weights_grad, True),
+            ("update_biases", self.update_biases, self._update_biases_grad, False),
+            ("candidate_weights", self.candidate_weights, self._candidate_weights_grad, True),
+            ("candidate_recurrent_weights", self.candidate_recurrent_weights, self._candidate_recurrent_weights_grad, True),
+            ("candidate_biases", self.candidate_biases, self._candidate_biases_grad, False),
+        ]
+
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Backward pass over a full sequence chunk (BPTT).

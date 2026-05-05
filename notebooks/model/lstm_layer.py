@@ -241,6 +241,22 @@ class LSTMLayer(BaseLayer):
             + self.candidate_weights.size + self.candidate_recurrent_weights.size + self.candidate_biases.size
         )
 
+    def parameter_items(self) -> list[tuple]:
+        return [
+            ("forget_weights", self.forget_weights, self._forget_weights_grad, True),
+            ("forget_recurrent_weights", self.forget_recurrent_weights, self._forget_recurrent_weights_grad, True),
+            ("forget_biases", self.forget_biases, self._forget_biases_grad, False),
+            ("input_weights", self.input_weights, self._input_weights_grad, True),
+            ("input_recurrent_weights", self.input_recurrent_weights, self._input_recurrent_weights_grad, True),
+            ("input_biases", self.input_biases, self._input_biases_grad, False),
+            ("output_weights", self.output_weights, self._output_weights_grad, True),
+            ("output_recurrent_weights", self.output_recurrent_weights, self._output_recurrent_weights_grad, True),
+            ("output_biases", self.output_biases, self._output_biases_grad, False),
+            ("candidate_weights", self.candidate_weights, self._candidate_weights_grad, True),
+            ("candidate_recurrent_weights", self.candidate_recurrent_weights, self._candidate_recurrent_weights_grad, True),
+            ("candidate_biases", self.candidate_biases, self._candidate_biases_grad, False),
+        ]
+
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
         Backward pass over a full sequence chunk (BPTT).

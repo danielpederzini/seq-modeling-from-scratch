@@ -127,6 +127,11 @@ class RecurrentLayer(Layer):
             Total number of trainable parameters
         """
         return super().parameter_count() + int(self.state_weights.shape[0] * self.state_weights.shape[1])
+
+    def parameter_items(self) -> list[tuple]:
+        return super().parameter_items() + [
+            ("state_weights", self.state_weights, self._state_weights_grad, True),
+        ]
     
     def backward_sequence(self, output_errors: list[cp.ndarray], batch_size: int, clip_value: Optional[float] = None) -> list[cp.ndarray]:
         """
