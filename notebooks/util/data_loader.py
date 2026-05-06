@@ -35,7 +35,7 @@ class DataLoader():
         validation_tokens = self._apply_merges(list(validation_text))
 
         self._vocabulary = sorted(set(train_tokens) | set(validation_tokens))
-        self._token_to_index = {token: idx for idx, token in enumerate(self._vocabulary)}
+        self._token_to_index = {token: index for index, token in enumerate(self._vocabulary)}
 
         self._x_train = train_tokens[:-1]
         self._y_train = train_tokens[1:]
@@ -167,7 +167,7 @@ class DataLoader():
 
         for index, token in enumerate(self._vocabulary):
             row, col = divmod(index, num_columns)
-            display_token = token.replace(" ", "·").replace("\n", "\\n").replace("\t", "\\t")
+            display_token = token.replace(" ", "_").replace("\n", "\\n").replace("\t", "\\t")
             y = rows - row - 1
             ax.text(col, y, display_token, ha="center", va="center", fontsize=font_size, family=font_family)
 
