@@ -1,9 +1,5 @@
 import cupy as cp
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from model.network import Network
-
+from model.network import Network
 
 class AdamWOptimizer:
     """
@@ -49,7 +45,7 @@ class AdamWOptimizer:
         self._second_moments: dict[tuple, cp.ndarray] = {}
         self.step_count: int = 0
 
-    def step(self, network: "Network", learning_rate: float) -> None:
+    def step(self, network: Network, learning_rate: float) -> None:
         """
         Apply one AdamW update step to all network parameters.
 
