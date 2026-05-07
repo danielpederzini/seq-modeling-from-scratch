@@ -64,10 +64,6 @@ class DropoutLayer(BaseLayer):
         """
         return [error * mask for error, mask in zip(output_errors, reversed(self._mask_history))]
 
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
-        """No-op: dropout has no trainable parameters."""
-        pass
-
     def describe(self) -> str:
         """Return a formatted description of the dropout rate."""
         return f"DropoutLayer\n  Rate: {self.rate}"

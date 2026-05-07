@@ -165,7 +165,7 @@ class Network:
         Backward pass over a full sequence chunk (BPTT).
 
         Each layer computes and accumulates its own gradients across all timesteps.
-        Call update_parameters afterwards to apply the accumulated gradients.
+        Call optimizer.step() afterwards to apply the accumulated gradients.
 
         Args:
             output_errors: Per-timestep error gradients from the loss, one array
@@ -177,18 +177,6 @@ class Network:
         current_errors = output_errors
         for layer in reversed(self.layers):
             current_errors = layer.backward_sequence(current_errors, batch_size, clip_value=clip_value)
-
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
-        """
-        Update all layer parameters using computed gradients.
-        
-        Args:
-            learning_rate: Learning rate for gradient descent update
-            weight_decay_lambda: Regularization parameter for weight decay
-            momentum: Momentum coefficient for SGD with momentum (0 disables it)
-        """
-        for layer in self.layers:
-            layer.update_parameters(learning_rate=learning_rate, weight_decay_lambda=weight_decay_lambda, momentum=momentum)
 
     def cce_loss(self, y_pred: cp.ndarray, y_true: cp.ndarray, epsilon=1e-15) -> cp.ndarray:
         """

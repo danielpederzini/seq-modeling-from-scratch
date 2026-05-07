@@ -16,8 +16,9 @@ class AdamWOptimizer:
     Weight decay is applied only to weight matrices (apply_weight_decay=True),
     not to bias vectors, matching the convention used throughout this codebase.
 
-    Layers that return an empty list from parameter_items() (e.g. EmbeddingLayer,
-    DropoutLayer) fall back to their own update_parameters() with weight_decay=0.
+    EmbeddingLayer returns an empty list from parameter_items() and falls back to
+    its own update_parameters() for scatter-add embedding updates. DropoutLayer
+    also returns an empty list; it inherits the no-op default from BaseLayer.
     """
 
     def __init__(

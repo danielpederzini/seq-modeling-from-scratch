@@ -83,19 +83,6 @@ class LSTMLayer(BaseLayer):
         self._candidate_recurrent_weights_grad: Optional[cp.ndarray] = None
         self._candidate_biases_grad: Optional[cp.ndarray] = None
 
-        self._forget_weights_velocity: Optional[cp.ndarray] = None
-        self._forget_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self._forget_biases_velocity: Optional[cp.ndarray] = None
-        self._input_weights_velocity: Optional[cp.ndarray] = None
-        self._input_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self._input_biases_velocity: Optional[cp.ndarray] = None
-        self._output_weights_velocity: Optional[cp.ndarray] = None
-        self._output_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self._output_biases_velocity: Optional[cp.ndarray] = None
-        self._candidate_weights_velocity: Optional[cp.ndarray] = None
-        self._candidate_recurrent_weights_velocity: Optional[cp.ndarray] = None
-        self._candidate_biases_velocity: Optional[cp.ndarray] = None
-
         self._input_history: list[cp.ndarray] = []
         self._prev_hidden_history: list[cp.ndarray] = []
         self._prev_cell_history: list[cp.ndarray] = []
@@ -362,55 +349,3 @@ class LSTMLayer(BaseLayer):
         self._input_errors = list(reversed(per_step_input_errors))
 
         return self._input_errors
-
-    def update_parameters(self, learning_rate: float, weight_decay_lambda: float = 0.0, momentum: float = 0.0) -> None:
-        """
-        Update this layer's trainable parameters, including recurrent weights.
-
-        Args:
-            learning_rate: Learning rate for gradient descent update
-            weight_decay_lambda: Regularization parameter for weight decay
-            momentum: Momentum coefficient passed through to all parameter updates
-        """
-        weight_params = [
-            ("forget_weights", "_forget_weights_grad", "_forget_weights_velocity"),
-            ("forget_recurrent_weights", "_forget_recurrent_weights_grad", "_forget_recurrent_weights_velocity"),
-            ("input_weights", "_input_weights_grad", "_input_weights_velocity"),
-            ("input_recurrent_weights", "_input_recurrent_weights_grad", "_input_recurrent_weights_velocity"),
-            ("output_weights", "_output_weights_grad", "_output_weights_velocity"),
-            ("output_recurrent_weights", "_output_recurrent_weights_grad", "_output_recurrent_weights_velocity"),
-            ("candidate_weights", "_candidate_weights_grad", "_candidate_weights_velocity"),
-            ("candidate_recurrent_weights", "_candidate_recurrent_weights_grad", "_candidate_recurrent_weights_velocity"),
-        ]
-        bias_params = [
-            ("forget_biases", "_forget_biases_grad", "_forget_biases_velocity"),
-            ("input_biases", "_input_biases_grad", "_input_biases_velocity"),
-            ("output_biases", "_output_biases_grad", "_output_biases_velocity"),
-            ("candidate_biases", "_candidate_biases_grad", "_candidate_biases_velocity"),
-        ]
-
-        for param_name, grad_name, vel_name in weight_params:
-            grad = getattr(self, grad_name)
-            if grad is None:
-                continue
-            param = getattr(self, param_name)
-            if momentum > 0.0:
-                vel = getattr(self, vel_name) if getattr(self, vel_name) is not None else cp.zeros_like(param)
-                vel = momentum * vel + grad + weight_decay_lambda * param
-                setattr(self, vel_name, vel)
-                setattr(self, param_name, param - learning_rate * vel)
-            else:
-                setattr(self, param_name, param - learning_rate * (grad + weight_decay_lambda * param))
-
-        for param_name, grad_name, vel_name in bias_params:
-            grad = getattr(self, grad_name)
-            if grad is None:
-                continue
-            param = getattr(self, param_name)
-            if momentum > 0.0:
-                vel = getattr(self, vel_name) if getattr(self, vel_name) is not None else cp.zeros_like(param)
-                vel = momentum * vel + grad
-                setattr(self, vel_name, vel)
-                setattr(self, param_name, param - learning_rate * vel)
-            else:
-                setattr(self, param_name, param - learning_rate * grad)
