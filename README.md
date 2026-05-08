@@ -67,7 +67,7 @@ Model quality is measured by **perplexity** ($e^{\text{avg. cross-entropy loss}}
 `EvaluationHelper` provides several post-training analyses:
 
 - **Text generation** - autoregressive sampling from a seed string with a configurable temperature parameter.
-![Example Output](docs/images/gru_example_output.png)
+![Output Example](docs/images/output_example.png)
 
 - **Token frequency plot** - bar chart of the most frequent tokens in the real validation data vs the generated text.
 ![Token Frequency](docs/images/lstm_token_frequencies.png)
